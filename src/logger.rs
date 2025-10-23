@@ -13,6 +13,7 @@ pub enum LogLevel {
     Warn,
     Error,
     Debug,
+    Critical,
 }
 
 /// Formats a log message with timestamp, level indicator, and color coding.
@@ -44,12 +45,13 @@ pub fn log_message(level: LogLevel, message: &str, module_name: Option<&str>) ->
         LogLevel::Warn => ("WARN", Color::Yellow),
         LogLevel::Error => ("ERROR", Color::Red),
         LogLevel::Debug => ("DEBUG", Color::DarkGrey),
+        LogLevel::Critical => ("CRITICAL", Color::AnsiValue(5)),
     };
 
     let module_prefix = module_name.map_or_else(String::new, |name| format!("{}/", name));
 
     match level {
-        LogLevel::Info | LogLevel::Warn | LogLevel::Error => {
+        LogLevel::Info | LogLevel::Warn | LogLevel::Error | LogLevel::Critical => {
             format!(
                 "[{}] {}[{}{}{}{}{}]{} {}{}",
                 timestamp,
@@ -167,4 +169,27 @@ macro_rules! debug {
             Some($module_name),
         )
     };
+}
+
+/// Macro for creating critical-level log messages.
+///
+/// # Examples
+///
+/// ```
+/// use daemon_console::critical;
+///
+/// let msg = critical!("Critical error");
+/// let msg_with_module = critical!("Critical error", "database");
+/// ```
+#[macro_export]
+macro_rules! critical {
+    ($message:expr) => {
+        $crate::logger::log_message($crate::logger::LogLevel::Critical, $message, None)
+    };
+    ($message:expr, $module_name:expr) => {
+        $crate::logger::log_message(
+            $crate::logger::LogLevel::Critical,
+            $message,
+        )
+    }
 }
