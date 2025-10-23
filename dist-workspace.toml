@@ -23,3 +23,6 @@ auto-changelog = true
 changelog-path = "CHANGELOG.md"
 # Release tag prefix
 release_tag_prefix = ""
+
+[dist.github]
+publish = true

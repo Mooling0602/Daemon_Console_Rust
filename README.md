@@ -14,6 +14,10 @@ For example, please read the source code: https://github.com/Mooling0602/Daemon_
 Please wait for a stable release first.
 
 ## Installation
+
+> [!INFO]
+> I'm preparing for auto-build to release, if success, then you can download the binary from GitHub release page.
+
 Clone the source codes to your device.
 ```sh
 git clone https://github.com/Mooling0602/Daemon_Console_Rust.git
