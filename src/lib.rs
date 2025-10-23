@@ -346,28 +346,24 @@ impl TerminalApp {
 
     /// Handles Ctrl+C key press with double-press confirmation.
     ///
-    /// First press clears input, second press within 5 seconds exits.
+    /// The first press clears input, the second press within 5 seconds exits.
     ///
     /// # Returns
     ///
     /// Tuple of (should_quit, message_to_display)
     pub fn handle_ctrl_c(&mut self) -> Result<(bool, String), Box<dyn std::error::Error>> {
-        let now = Instant::now();
-
-        if let Some(last_time) = self.last_ctrl_c.as_ref() {
-            if now.duration_since(*last_time).as_secs() < 5 {
-                return Ok((true, warn!("Exiting application. Goodbye!")));
-            }
-        }
-
         if !self.current_input.is_empty() {
             self.current_input.clear();
             self.cursor_position = 0;
-            self.last_ctrl_c = Some(now);
+            self.last_ctrl_c = Some(Instant::now());
             return Ok((false, info!("Input cleared. Press Ctrl+C again to exit.")));
         }
-
-        self.last_ctrl_c = Some(now);
+        if let Some(last_time) = self.last_ctrl_c
+            && last_time.elapsed().as_secs() < 5
+        {
+            return Ok((true, warn!("Exiting application. Goodbye!")));
+        }
+        self.last_ctrl_c = Some(Instant::now());
         Ok((false, info!("Press Ctrl+C again to exit.")))
     }
 
