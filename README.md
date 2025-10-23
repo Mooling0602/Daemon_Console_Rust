@@ -12,3 +12,14 @@ For example, please read the source code: https://github.com/Mooling0602/Daemon_
 
 ### For developers: Install and import this to your projects.
 Please wait for a stable release first.
+
+## Installation
+Clone the source codes to your device.
+```sh
+git clone https://github.com/Mooling0602/Daemon_Console_Rust.git
+```
+Then directly run it.
+```bash/fish/zsh/PowerSell
+cd Daemon_Console_Rust
+cargo run
+```
