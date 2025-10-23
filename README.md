@@ -15,7 +15,7 @@ Please wait for a stable release first.
 
 ## Installation
 
-> [!INFO]
+> [!NOTE]
 > I'm preparing for auto-build to release, if success, then you can download the binary from GitHub release page.
 
 Clone the source codes to your device.

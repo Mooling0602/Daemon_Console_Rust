@@ -220,7 +220,7 @@ impl TerminalApp {
         Ok(should_quit)
     }
 
-    /// Shuts down the terminal and displays exit message.
+    /// Shuts down the terminal and displays exit messages.
     ///
     /// # Arguments
     ///
@@ -358,16 +358,16 @@ impl TerminalApp {
             self.last_ctrl_c = Some(Instant::now());
             return Ok((false, info!("Input cleared. Press Ctrl+C again to exit.")));
         }
-        if let Some(last_time) = self.last_ctrl_c
-            && last_time.elapsed().as_secs() < 5
-        {
-            return Ok((true, warn!("Exiting application. Goodbye!")));
-        }
+        if let Some(last_time) = self.last_ctrl_c {
+            if last_time.elapsed().as_secs() < 5 {
+                    return Ok((true, warn!("Exiting application. Goodbye!")));
+                }
+            }
         self.last_ctrl_c = Some(Instant::now());
         Ok((false, info!("Press Ctrl+C again to exit.")))
     }
 
-    /// Handles up arrow key press for command history navigation.
+    /// Handles up the arrow key press for command history navigation.
     fn handle_up_key(&mut self) {
         if self.command_history.is_empty() {
             return;
