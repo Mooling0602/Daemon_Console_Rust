@@ -1,7 +1,12 @@
-use crossterm::style::{self, Color, ResetColor, SetForegroundColor};
-use chrono::Local;
+//! Logging utilities with colored terminal output.
+//!
+//! This module provides a logging system with different severity levels
+//! (Info, Warn, Error, Debug) and automatic timestamp formatting.
 
-/// 定义日志级别
+use chrono::Local;
+use crossterm::style::{self, Color, ResetColor, SetForegroundColor};
+
+/// Log level enumeration for categorizing log messages.
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum LogLevel {
     Info,
@@ -10,8 +15,26 @@ pub enum LogLevel {
     Debug,
 }
 
-/// 格式化日志消息，包含时间戳、日志级别和颜色
-/// 返回一个包含ANSI颜色码的字符串，供终端应用显示
+/// Formats a log message with timestamp, level indicator, and color coding.
+///
+/// # Arguments
+///
+/// * `level` - Severity level of the log message
+/// * `message` - Content of the log message
+/// * `module_name` - Optional module name prefix
+///
+/// # Returns
+///
+/// Formatted string with ANSI color codes for terminal display
+///
+/// # Examples
+///
+/// ```
+/// use daemon_console::logger::{log_message, LogLevel};
+///
+/// let msg = log_message(LogLevel::Info, "Application started", Some("main"));
+/// println!("{}", msg);
+/// ```
 pub fn log_message(level: LogLevel, message: &str, module_name: Option<&str>) -> String {
     let now = Local::now();
     let timestamp = now.format("%H:%M:%S").to_string();
@@ -26,93 +49,122 @@ pub fn log_message(level: LogLevel, message: &str, module_name: Option<&str>) ->
     let module_prefix = module_name.map_or_else(String::new, |name| format!("{}/", name));
 
     match level {
-        // 对于 Info, Warn, Error 级别，只对日志级别字符串应用颜色和粗体
         LogLevel::Info | LogLevel::Warn | LogLevel::Error => {
             format!(
-                "[{}] {}[{}{}{}{}{}]{} {}{}", // 时间戳默认，级别字符串颜色粗体，消息默认
+                "[{}] {}[{}{}{}{}{}]{} {}{}",
                 timestamp,
-                style::Attribute::Bold,             // 设置粗体
-                module_prefix,                      // 模块名称
-                SetForegroundColor(color),          // 设置前景颜色
-                level_str,                          // 日志级别字符串
-                ResetColor,                         // 重置样式
-                style::Attribute::Bold,             //
-                ResetColor,                         //
-                message,                            // 实际消息
+                style::Attribute::Bold,
+                module_prefix,
+                SetForegroundColor(color),
+                level_str,
+                ResetColor,
+                style::Attribute::Bold,
+                ResetColor,
+                message,
                 ResetColor
             )
         }
-        // 对于 Debug 级别，整条日志都应用颜色和粗体
         LogLevel::Debug => {
             format!(
                 "{}{}[{}] [{}{}]{} {}{}{}",
-                SetForegroundColor(color),          // 设置前景颜色
-                style::Attribute::Italic,             // 设置斜体
-                timestamp,                          // 时间戳
+                SetForegroundColor(color),
+                style::Attribute::Italic,
+                timestamp,
                 module_prefix,
-                level_str,                          // 日志级别字符串
+                level_str,
                 ResetColor,
                 style::Attribute::Italic,
-                message,                            // 实际消息
-                ResetColor,                         // 重置所有颜色和属性
+                message,
+                ResetColor,
             )
         }
     }
 }
 
-// 便捷的日志函数
-// pub fn info(message: &str, module_name: Option<&str>) -> String {
-//     log_message(LogLevel::Info, message, module_name)
-// }
-
+/// Macro for creating info-level log messages.
+///
+/// # Examples
+///
+/// ```
+/// use daemon_console::info;
+///
+/// let msg = info!("Server started");
+/// let msg_with_module = info!("Database connected", "db");
+/// ```
 #[macro_export]
 macro_rules! info {
     ($message:expr) => {
-        $crate::logger::log_message($crate::logger::LogLevel::Info, $message, None) // 移除分号
+        $crate::logger::log_message($crate::logger::LogLevel::Info, $message, None)
     };
     ($message:expr, $module_name:expr) => {
-        $crate::logger::log_message($crate::logger::LogLevel::Info, $message, Some($module_name)) // 移除分号
+        $crate::logger::log_message($crate::logger::LogLevel::Info, $message, Some($module_name))
     };
 }
 
-// pub fn warn(message: &str, module_name: Option<&str>) -> String {
-//     log_message(LogLevel::Warn, message, module_name)
-// }
-
+/// Macro for creating warning-level log messages.
+///
+/// # Examples
+///
+/// ```
+/// use daemon_console::warn;
+///
+/// let msg = warn!("Memory usage high");
+/// let msg_with_module = warn!("Connection timeout", "network");
+/// ```
 #[macro_export]
 macro_rules! warn {
     ($message:expr) => {
-        $crate::logger::log_message($crate::logger::LogLevel::Warn, $message, None) // 移除分号
+        $crate::logger::log_message($crate::logger::LogLevel::Warn, $message, None)
     };
     ($message:expr, $module_name:expr) => {
-        $crate::logger::log_message($crate::logger::LogLevel::Warn, $message, Some($module_name)) // 移除分号
+        $crate::logger::log_message($crate::logger::LogLevel::Warn, $message, Some($module_name))
     };
 }
 
-// pub fn error(message: &str, module_name: Option<&str>) -> String {
-//     log_message(LogLevel::Error, message, module_name)
-// }
-
+/// Macro for creating error-level log messages.
+///
+/// # Examples
+///
+/// ```
+/// use daemon_console::error;
+///
+/// let msg = error!("Failed to connect");
+/// let msg_with_module = error!("Authentication failed", "auth");
+/// ```
 #[macro_export]
 macro_rules! error {
     ($message:expr) => {
-        $crate::logger::log_message($crate::logger::LogLevel::Error, $message, None) // 移除分号
+        $crate::logger::log_message($crate::logger::LogLevel::Error, $message, None)
     };
     ($message:expr, $module_name:expr) => {
-        $crate::logger::log_message($crate::logger::LogLevel::Error, $message, Some($module_name)) // 移除分号
+        $crate::logger::log_message(
+            $crate::logger::LogLevel::Error,
+            $message,
+            Some($module_name),
+        )
     };
 }
 
-// pub fn debug(message: &str, module_name: Option<&str>) -> String {
-//     log_message(LogLevel::Debug, message, module_name)
-// }
-
+/// Macro for creating debug-level log messages.
+///
+/// # Examples
+///
+/// ```
+/// use daemon_console::debug;
+///
+/// let msg = debug!("Variable value: 42");
+/// let msg_with_module = debug!("Request received", "http");
+/// ```
 #[macro_export]
 macro_rules! debug {
     ($message:expr) => {
-        $crate::logger::log_message($crate::logger::LogLevel::Debug, $message, None) // 移除分号
+        $crate::logger::log_message($crate::logger::LogLevel::Debug, $message, None)
     };
     ($message:expr, $module_name:expr) => {
-        $crate::logger::log_message($crate::logger::LogLevel::Debug, $message, Some($module_name)) // 移除分号
+        $crate::logger::log_message(
+            $crate::logger::LogLevel::Debug,
+            $message,
+            Some($module_name),
+        )
     };
 }
