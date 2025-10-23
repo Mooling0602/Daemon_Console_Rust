@@ -1,7 +1,19 @@
-//! Terminal application library providing command-line interface functionality.
+//! # daemon_console
 //!
-//! This library offers a complete terminal UI framework with command registration,
-//! history management, and customizable command handling.
+//! A flexible console for daemon applications providing a terminal interface
+//! with command registration, history navigation, and colored logging.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use daemon_console::TerminalApp;
+//!
+//! let mut app = TerminalApp::new();
+//! // Register commands and run
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod logger;
 

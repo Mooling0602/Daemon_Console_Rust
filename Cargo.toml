@@ -1,14 +1,14 @@
 [package]
 name = "daemon_console"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2024"
-authors = ["Mooling0602 CleMooling@outlook.com"]
+authors = ["Mooling0602 <CleMooling@outlook.com>"]
 description = "A flexible console for daemon applications."
 repository = "https://github.com/Mooling0602/Daemon_Console_Rust"
-homepage = "https://github.com/Mooling0602/Daemon_Console_Rust"
+homepage = "https://crates.io/crates/daemon_console"
 license = "GPL-3.0"
 readme = "README.md"
-documentation = "https://github.com/Mooling0602/Daemon_Console_Rust"
+documentation = "https://docs.rs/daemon_console"
 keywords = ["console", "daemon", "terminal", "cli"]
 categories = ["command-line-utilities", "command-line-interface"]
 exclude = [
@@ -16,6 +16,10 @@ exclude = [
     ".git/",
     ".gitignore",
 ]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 crossterm = "0.29.0"
