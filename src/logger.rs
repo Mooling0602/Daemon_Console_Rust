@@ -190,6 +190,7 @@ macro_rules! critical {
         $crate::logger::log_message(
             $crate::logger::LogLevel::Critical,
             $message,
+            Some($module_name),
         )
-    }
+    };
 }

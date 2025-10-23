@@ -3,7 +3,7 @@
 //! This application provides a terminal interface with registered example commands
 //! including 'list', 'help', 'exit', 'debug', 'hello', and 'test'.
 
-use daemon_console::{TerminalApp, debug, error, info, warn};
+use daemon_console::{TerminalApp, debug, error, info, warn, critical};
 use std::process::Command;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -112,5 +112,12 @@ fn register_commands(app: &mut TerminalApp) {
                 info!("Success!")
             }
         }),
-    )
+    );
+
+    app.register_command(
+        "crash",
+        Box::new(|_: &mut TerminalApp, _: &[&str]| -> String {
+            critical!("Dangerous option!")
+        }),
+    );
 }

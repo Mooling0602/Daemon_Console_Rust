@@ -1,6 +1,6 @@
 [package]
 name = "daemon_console"
-version = "0.0.2"
+version = "0.1.0"
 edition = "2024"
 authors = ["Mooling0602 <CleMooling@outlook.com>"]
 description = "A flexible console for daemon applications."
@@ -33,3 +33,8 @@ path = "src/lib.rs"
 [[bin]]
 name = "daemon_console"
 path = "src/main.rs"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
