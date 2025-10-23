@@ -21,3 +21,5 @@ announcement-title = "v{version}"
 auto-changelog = true
 # Changelog file
 changelog-path = "CHANGELOG.md"
+# Release tag prefix
+release_tag_prefix = ""
