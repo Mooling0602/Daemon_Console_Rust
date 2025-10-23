@@ -8,7 +8,11 @@ license = "GPL-3"
 readme = "README.md"
 keywords = ["console", "daemon", "terminal", "cli"]
 categories = ["command-line-utilities", "command-line-interface"]
-exclude = ["target/"]
+exclude = [
+    "target/",
+    ".git/",
+    ".gitignore",
+]
 
 [dependencies]
 crossterm = "0.29.0"
