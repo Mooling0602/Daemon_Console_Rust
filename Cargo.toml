@@ -22,16 +22,13 @@ exclude = [
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
-[package.metadata.wix]
-upgrade-guid = "650695BD-DEA6-4C09-9489-37B4E402378B"
-path-guid = "5B30BFC3-C0FC-4690-91DB-E6399D2F8638"
-license = false
-eula = false
-
 [dependencies]
 crossterm = "0.29.0"
 unicode-width = "0.2.2"
 chrono = "0.4.31"
+tokio = { version = "1.0", features = ["full"] }
+futures = "0.3"
+async-trait = "0.1"
 
 [lib]
 name = "daemon_console"

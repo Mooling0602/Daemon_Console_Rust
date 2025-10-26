@@ -1,17 +1,22 @@
 //! Main entry point for the daemon console application.
 //!
 //! This application provides a terminal interface with registered example commands
-//! including 'list', 'help', 'exit', 'debug', 'hello', and 'test'.
+//! including 'list', 'help', 'exit', 'debug', 'hello', 'test', and async commands like 'sleep'.
 
+use async_trait::async_trait;
+use daemon_console::{AsyncCommandHandler, TerminalApp, critical, debug, error, info, warn};
 use crossterm::terminal::disable_raw_mode;
 use daemon_console::{TerminalApp, get_debug, get_error, get_info, get_warn};
 use std::io::{Write, stdout};
 use std::process::Command;
+use std::time::Duration;
+use tokio::time::sleep;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut app = TerminalApp::new();
 
-    register_commands(&mut app);
+    register_commands(&mut app).await;
 
     app.set_unknown_command_handler(|command: &str| {
         if command.starts_with("sudo") {
@@ -30,12 +35,62 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let startup_message = get_info!(
-        "TerminalApp started. Press Ctrl+D or Ctrl+C twice to exit.",
+        "TerminalApp started with async support. Press Ctrl+D or Ctrl+C twice to exit.",
         "Daemon"
     );
     let exit_message = get_info!("TerminalApp exiting. Goodbye!", "Daemon");
 
-    app.run(&startup_message, &exit_message)
+    app.run(&startup_message, &exit_message).await
+}
+
+/// Async command handler for the sleep command
+#[derive(Clone)]
+struct SleepCommand;
+
+#[async_trait]
+impl AsyncCommandHandler for SleepCommand {
+    async fn execute_async(&mut self, _app: &mut TerminalApp, args: &[&str]) -> String {
+        if args.is_empty() {
+            return error!("Usage: sleep <seconds>");
+        }
+
+        match args[0].parse::<u64>() {
+            Ok(seconds) => {
+                sleep(Duration::from_secs(seconds)).await;
+                info!(&format!("Finished sleeping for {} seconds!", seconds))
+            }
+            Err(_) => error!("Invalid number format. Please provide a valid number of seconds."),
+        }
+    }
+
+    fn box_clone(&self) -> Box<dyn AsyncCommandHandler> {
+        Box::new(self.clone())
+    }
+}
+
+/// Async command handler for network simulation
+#[derive(Clone)]
+struct NetworkCommand;
+
+#[async_trait]
+impl AsyncCommandHandler for NetworkCommand {
+    async fn execute_async(&mut self, _app: &mut TerminalApp, args: &[&str]) -> String {
+        let delay = if !args.is_empty() && args[0].parse::<u64>().is_ok() {
+            args[0].parse::<u64>().unwrap()
+        } else {
+            2
+        };
+
+        sleep(Duration::from_secs(delay)).await;
+        info!(&format!(
+            "Network request completed after {} seconds!",
+            delay
+        ))
+    }
+
+    fn box_clone(&self) -> Box<dyn AsyncCommandHandler> {
+        Box::new(self.clone())
+    }
 }
 
 /// Registers all available commands with the terminal application.
@@ -43,7 +98,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// # Arguments
 ///
 /// * `app` - Mutable reference to the terminal application
-fn register_commands(app: &mut TerminalApp) {
+async fn register_commands(app: &mut TerminalApp) {
+    // Synchronous commands
     app.register_command(
         "list",
         Box::new(|_app: &mut TerminalApp, args: &[&str]| -> String {
@@ -76,7 +132,7 @@ fn register_commands(app: &mut TerminalApp) {
     app.register_command(
         "help",
         Box::new(|_: &mut TerminalApp, _: &[&str]| -> String {
-            get_info!("Available commands: 'list', 'help', 'exit', 'debug', 'hello' and 'test'.")
+            get_info!("Available commands:\n  Sync: 'list', 'help', 'exit', 'debug', 'hello', 'test', 'crash'\n  Async (non-blocking): 'sleep <seconds>', 'network [delay]'\n\nAsync commands run in the background - you can continue typing while they execute!")
         }),
     );
 
@@ -140,4 +196,8 @@ fn register_commands(app: &mut TerminalApp) {
             get_info!("Type this command again to crash the application.")
         }),
     );
+
+    // Asynchronous commands
+    app.register_async_command("sleep", Box::new(SleepCommand));
+    app.register_async_command("network", Box::new(NetworkCommand));
 }

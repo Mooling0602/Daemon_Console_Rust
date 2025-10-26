@@ -1,29 +1,86 @@
 # Daemon Console
-A flexible console for daemon applications.
 
-## Develop
-For example, please read the source code: https://github.com/Mooling0602/Daemon_Console_Rust/blob/main/src/main.rs
+A flexible console for daemon applications providing a terminal interface with command registration, history navigation, and colored logging.
+
+## Features
+
+- Command history with up/down arrow navigation
+- Colored logging with different severity levels (info, warn, error, debug, critical)
+- Customizable unknown command handling
+- Raw terminal mode for smooth user experience
+- Support for both sync and async command handlers
 
 ## Usage
-### For normal users
-> Developers can share this part immediately to your users.
-- Use keys like `↑↓` to switch command history, `←→` to move the cursor to edit the command input texts.
-- Use `Ctrl+D` or `Ctrl+C`(twice to confirm) to exit the console.
 
-### For developers
-See https://docs.rs/daemon_console/latest/daemon_console/
+Add this to your `Cargo.toml`:
 
-## Installation
-
-> [!NOTE]
-> I'm preparing for auto-build to release, if success, then you can download the binary from GitHub release page.
-
-Clone the source codes to your device.
-```sh
-git clone https://github.com/Mooling0602/Daemon_Console_Rust.git
+```toml
+[dependencies]
+daemon_console = "0.2.0"
 ```
-Then directly run it.
-```bash/fish/zsh/PowerSell
-cd Daemon_Console_Rust
-cargo run
+
+Basic usage:
+
+```rust
+use daemon_console::TerminalApp;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut app = TerminalApp::new();
+    
+    // Register a simple command
+    app.register_command(
+        "hello",
+        Box::new(|_app: &mut TerminalApp, args: &[&str]| -> String {
+            if args.is_empty() {
+                "Hello, World!".to_string()
+            } else {
+                format!("Hello, {}!", args.join(" "))
+            }
+        }),
+    );
+    
+    // Run the application
+    app.run("Terminal started. Press Ctrl+D to exit.", "Goodbye!")
+}
 ```
+
+## Async Commands
+
+The library also supports async command handlers:
+
+```rust
+use daemon_console::TerminalApp;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut app = TerminalApp::new();
+    
+    // Register an async command
+    app.register_async_command(
+        "async_hello",
+        Box::new(AsyncHelloCommand {}),
+    );
+    
+    app.run("Terminal started. Press Ctrl+D to exit.", "Goodbye!")
+}
+
+struct AsyncHelloCommand;
+
+#[async_trait::async_trait]
+impl daemon_console::AsyncCommandHandler for AsyncHelloCommand {
+    async fn execute(&mut self, _app: &mut TerminalApp, args: &[&str]) -> String {
+        // Simulate async work
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        
+        if args.is_empty() {
+            "Hello, World!".to_string()
+        } else {
+            format!("Hello, {}!", args.join(" "))
+        }
+    }
+}
+```
+
+## License
+
+This project is licensed under GPL-3.0.
