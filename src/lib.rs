@@ -382,7 +382,7 @@ impl TerminalApp {
         self.cursor_position = self.current_input.chars().count();
     }
 
-    /// Handles down arrow key press for command history navigation.
+    /// Handles down the arrow key press for command history navigation.
     fn handle_down_key(&mut self) {
         let new_index = match self.history_index {
             Some(idx) if idx < self.command_history.len() - 1 => idx + 1,
@@ -482,7 +482,7 @@ impl TerminalApp {
         }
     }
 
-    /// Handles character input by inserting at cursor position.
+    /// Handles character input by inserting at the cursor position.
     fn handle_char_input(&mut self, c: char) {
         self.current_input.insert(self.cursor_position, c);
         self.cursor_position += 1;
