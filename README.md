@@ -10,8 +10,8 @@ For example, please read the source code: https://github.com/Mooling0602/Daemon_
 - Use keys like `↑↓` to switch command history, `←→` to move the cursor to edit the command input texts.
 - Use `Ctrl+D` or `Ctrl+C`(twice to confirm) to exit the console.
 
-### For developers: Install and import this to your projects.
-Please wait for a stable release first.
+### For developers
+See https://docs.rs/daemon_console/latest/daemon_console/
 
 ## Installation
 
