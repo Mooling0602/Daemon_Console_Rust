@@ -129,6 +129,7 @@ pub struct TerminalApp {
     pub history_index: Option<usize>,
     pub last_ctrl_c: Option<Instant>,
     pub cursor_position: usize,
+    pub should_exit: bool,
     commands: HashMap<String, CommandHandlerType>,
     unknown_command_handler: Option<UnknownCommandHandler>,
     async_unknown_command_handler: Option<AsyncUnknownCommandHandler>,
@@ -153,6 +154,7 @@ impl TerminalApp {
             history_index: None,
             last_ctrl_c: None,
             cursor_position: 0,
+            should_exit: false,
             commands: HashMap::new(),
             unknown_command_handler: None,
             async_unknown_command_handler: None,
@@ -293,7 +295,10 @@ impl TerminalApp {
                     }
                 }
                 KeyCode::Enter => {
-                    self.handle_enter_key(stdout, "> ").await?;
+                    let should_exit = self.handle_enter_key(stdout, "> ").await?;
+                    if should_exit {
+                        return Ok(true);
+                    }
                 }
                 KeyCode::Char(c) => {
                     self.handle_char_input(c);
@@ -541,7 +546,7 @@ impl TerminalApp {
         &mut self,
         stdout: &mut Stdout,
         input_prefix: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<bool, Box<dyn std::error::Error>> {
         if !self.current_input.trim().is_empty() {
             self.command_history.push(self.current_input.clone());
             self.clear_input_line(stdout)?;
@@ -564,7 +569,7 @@ impl TerminalApp {
             self.clear_input_line(stdout)?;
             self._render_input_line(stdout)?;
         }
-        Ok(())
+        Ok(self.should_exit)
     }
 
     /// Executes a command by looking it up in the registered commands.
@@ -684,7 +689,7 @@ impl TerminalApp {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let parts: Vec<&str> = command.split_whitespace().collect();
         let args = if parts.len() > 1 { &parts[1..] } else { &[] };
-        let args: Vec<String> = args.iter().map(|&s| s.to_string()).collect();
+        let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
         let tx = self.command_result_tx.as_ref().unwrap().clone();
         let cmd_copy = command.clone();
 

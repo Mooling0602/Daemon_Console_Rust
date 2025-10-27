@@ -65,31 +65,6 @@ impl AsyncCommandHandler for SleepCommand {
     }
 }
 
-/// Async command handler for network simulation
-#[derive(Clone)]
-struct NetworkCommand;
-
-#[async_trait]
-impl AsyncCommandHandler for NetworkCommand {
-    async fn execute_async(&mut self, _app: &mut TerminalApp, args: &[&str]) -> String {
-        let delay = if !args.is_empty() && args[0].parse::<u64>().is_ok() {
-            args[0].parse::<u64>().unwrap()
-        } else {
-            2
-        };
-
-        sleep(Duration::from_secs(delay)).await;
-        info!(&format!(
-            "Network request completed after {} seconds!",
-            delay
-        ))
-    }
-
-    fn box_clone(&self) -> Box<dyn AsyncCommandHandler> {
-        Box::new(self.clone())
-    }
-}
-
 /// Registers all available commands with the terminal application.
 ///
 /// # Arguments
@@ -129,14 +104,15 @@ async fn register_commands(app: &mut TerminalApp) {
     app.register_command(
         "help",
         Box::new(|_: &mut TerminalApp, _: &[&str]| -> String {
-            info!("Available commands:\n  Sync: 'list', 'help', 'exit', 'debug', 'hello', 'test', 'crash'\n  Async (non-blocking): 'sleep <seconds>', 'network [delay]'\n\nAsync commands run in the background - you can continue typing while they execute!")
+            info!("Available commands:\n  Sync: 'list', 'help', 'exit', 'debug', 'hello', 'test', 'crash'\n  Async (non-blocking): 'wait <seconds>' \nAsync commands run in the background - you can continue typing while they execute!")
         }),
     );
 
     app.register_command(
         "exit",
-        Box::new(|_: &mut TerminalApp, _: &[&str]| -> String {
-            warn!("Press Ctrl+C(twice to confirm) or Ctrl+D to exit.")
+        Box::new(|app: &mut TerminalApp, _: &[&str]| -> String {
+            app.should_exit = true;
+            warn!("Exiting application by command 'exit'...")
         }),
     );
 
@@ -175,6 +151,5 @@ async fn register_commands(app: &mut TerminalApp) {
     );
 
     // Asynchronous commands
-    app.register_async_command("sleep", Box::new(SleepCommand));
-    app.register_async_command("network", Box::new(NetworkCommand));
+    app.register_async_command("wait", Box::new(SleepCommand));
 }
