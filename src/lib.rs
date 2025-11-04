@@ -77,6 +77,7 @@ pub struct TerminalApp {
     pub cursor_position: usize,
     commands: HashMap<String, Box<dyn CommandHandler>>,
     unknown_command_handler: Option<UnknownCommandHandler>,
+    last_key_event: Option<KeyEvent>,
 }
 
 impl Default for TerminalApp {
@@ -96,6 +97,7 @@ impl TerminalApp {
             cursor_position: 0,
             commands: HashMap::new(),
             unknown_command_handler: None,
+            last_key_event: None,
         }
     }
 
@@ -167,6 +169,33 @@ impl TerminalApp {
         stdout: &mut Stdout,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         let mut should_quit = false;
+        
+        if let Event::Key(key_event) = &event {
+            if key_event.kind != crossterm::event::KeyEventKind::Press {
+                return Ok(should_quit);
+            }
+            
+            if let Some(last_event) = &self.last_key_event {
+                if last_event.code == key_event.code && 
+                   last_event.modifiers == key_event.modifiers &&
+                   last_event.kind == key_event.kind {
+                    let is_control_key = match key_event.code {
+                        KeyCode::Char('c') if key_event.modifiers == KeyModifiers::CONTROL => true,
+                        KeyCode::Char('d') if key_event.modifiers == KeyModifiers::CONTROL => true,
+                        _ => false,
+                    };
+                    
+                    if is_control_key {
+                        self.last_key_event = Some(*key_event);
+                    } else {
+                        self.last_key_event = Some(*key_event);
+                        return Ok(should_quit);
+                    }
+                }
+            }
+            self.last_key_event = Some(*key_event);
+        }
+        
         if let Event::Key(KeyEvent {
             code, modifiers, ..
         }) = event
