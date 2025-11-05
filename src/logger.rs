@@ -88,13 +88,13 @@ pub fn log_message(level: LogLevel, message: &str, module_name: Option<&str>) ->
 /// # Examples
 ///
 /// ```
-/// use daemon_console::info;
+/// use daemon_console::get_info;
 ///
-/// let msg = info!("Server started");
-/// let msg_with_module = info!("Database connected", "db");
+/// let msg = get_info!("Server started");
+/// let msg_with_module = get_info!("Database connected", "db");
 /// ```
 #[macro_export]
-macro_rules! info {
+macro_rules! get_info {
     ($message:expr) => {
         $crate::logger::log_message($crate::logger::LogLevel::Info, $message, None)
     };
@@ -103,18 +103,35 @@ macro_rules! info {
     };
 }
 
+/// Macro for printing info-level log messages.
+///
+/// # Examples
+///
+/// ```
+/// use daemon_console::info;
+///
+/// info!("Server started");
+/// info!("Database connected", "db");
+/// ```
+#[macro_export]
+macro_rules! info {
+    ($message:expr) => {
+        println!("{}", $crate::get_info!($message))
+    }
+}
+
 /// Macro for creating warning-level log messages.
 ///
 /// # Examples
 ///
 /// ```
-/// use daemon_console::warn;
+/// use daemon_console::get_warn;
 ///
-/// let msg = warn!("Memory usage high");
-/// let msg_with_module = warn!("Connection timeout", "network");
+/// let msg = get_warn!("Memory usage high");
+/// let msg_with_module = get_warn!("Connection timeout", "network");
 /// ```
 #[macro_export]
-macro_rules! warn {
+macro_rules! get_warn {
     ($message:expr) => {
         $crate::logger::log_message($crate::logger::LogLevel::Warn, $message, None)
     };
@@ -123,18 +140,35 @@ macro_rules! warn {
     };
 }
 
+/// Macro for printing warning-level log messages.
+///
+/// # Examples
+///
+/// ```
+/// use daemon_console::warn;
+///
+/// warn!("Memory usage high");
+/// warn!("Connection timeout", "network");
+/// ```
+#[macro_export]
+macro_rules! warn {
+    ($message:expr) => {
+        println!("{}", $crate::get_warn!($message))
+    }
+}
+
 /// Macro for creating error-level log messages.
 ///
 /// # Examples
 ///
 /// ```
-/// use daemon_console::error;
+/// use daemon_console::get_error;
 ///
-/// let msg = error!("Failed to connect");
-/// let msg_with_module = error!("Authentication failed", "auth");
+/// let msg = get_error!("Failed to connect");
+/// let msg_with_module = get_error!("Authentication failed", "auth");
 /// ```
 #[macro_export]
-macro_rules! error {
+macro_rules! get_error {
     ($message:expr) => {
         $crate::logger::log_message($crate::logger::LogLevel::Error, $message, None)
     };
@@ -147,18 +181,35 @@ macro_rules! error {
     };
 }
 
+/// Macro for printing error-level log messages.
+///
+/// # Examples
+///
+/// ```
+/// use daemon_console::error;
+///
+/// error!("Failed to connect");
+/// error!("Authentication failed", "auth");
+/// ```
+#[macro_export]
+macro_rules! error {
+    ($message:expr) => {
+        println!("{}", $crate::get_error!($message))
+    }
+}
+
 /// Macro for creating debug-level log messages.
 ///
 /// # Examples
 ///
 /// ```
-/// use daemon_console::debug;
+/// use daemon_console::get_debug;
 ///
-/// let msg = debug!("Variable value: 42");
-/// let msg_with_module = debug!("Request received", "http");
+/// let msg = get_debug!("Variable value: 42");
+/// let msg_with_module = get_debug!("Request received", "http");
 /// ```
 #[macro_export]
-macro_rules! debug {
+macro_rules! get_debug {
     ($message:expr) => {
         $crate::logger::log_message($crate::logger::LogLevel::Debug, $message, None)
     };
@@ -171,18 +222,35 @@ macro_rules! debug {
     };
 }
 
+/// Macro for printing debug-level log messages.
+///
+/// # Examples
+///
+/// ```
+/// use daemon_console::debug;
+///
+/// debug!("Variable value: 42");
+/// debug!("Request received", "http");
+/// ```
+#[macro_export]
+macro_rules! debug {
+    ($message:expr) => {
+        println!("{}", $crate::get_debug!($message))
+    }
+}
+
 /// Macro for creating critical-level log messages.
 ///
 /// # Examples
 ///
 /// ```
-/// use daemon_console::critical;
+/// use daemon_console::get_critical;
 ///
-/// let msg = critical!("Critical error");
-/// let msg_with_module = critical!("Critical error", "database");
+/// let msg = get_critical!("Critical error");
+/// let msg_with_module = get_critical!("Critical error", "database");
 /// ```
 #[macro_export]
-macro_rules! critical {
+macro_rules! get_critical {
     ($message:expr) => {
         $crate::logger::log_message($crate::logger::LogLevel::Critical, $message, None)
     };
@@ -193,4 +261,21 @@ macro_rules! critical {
             Some($module_name),
         )
     };
+}
+
+/// Macro for printing critical-level log messages.
+///
+/// # Examples
+///
+/// ```
+/// use daemon_console::critical;
+///
+/// critical!("Critical error");
+/// critical!("Critical error", "database");
+/// ```
+#[macro_export]
+macro_rules! critical {
+    ($message:expr) => {
+        println!("{}", $crate::get_critical!($message))
+    }
 }

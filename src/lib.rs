@@ -356,15 +356,15 @@ impl TerminalApp {
             self.current_input.clear();
             self.cursor_position = 0;
             self.last_ctrl_c = Some(Instant::now());
-            return Ok((false, info!("Input cleared. Press Ctrl+C again to exit.")));
+            return Ok((false, get_info!("Input cleared. Press Ctrl+C again to exit.")));
         }
         if let Some(last_time) = self.last_ctrl_c
             && last_time.elapsed().as_secs() < 5
         {
-            return Ok((true, warn!("Exiting application. Goodbye!")));
+            return Ok((true, get_warn!("Exiting application. Goodbye!")));
         }
         self.last_ctrl_c = Some(Instant::now());
-        Ok((false, info!("Press Ctrl+C again to exit.")))
+        Ok((false, get_info!("Press Ctrl+C again to exit.")))
     }
 
     /// Handles up the arrow key press for command history navigation.
@@ -477,7 +477,7 @@ impl TerminalApp {
             if let Some(ref handler) = self.unknown_command_handler {
                 handler(command)
             } else {
-                warn!(&format!("Unknown command: '{}'", command))
+                get_warn!(&format!("Unknown command: '{}'", command))
             }
         }
     }

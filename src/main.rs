@@ -3,7 +3,7 @@
 //! This application provides a terminal interface with registered example commands
 //! including 'list', 'help', 'exit', 'debug', 'hello', and 'test'.
 
-use daemon_console::{TerminalApp, debug, error, info, warn, critical};
+use daemon_console::{TerminalApp, critical, get_debug, get_error, get_info, get_warn, info, warn};
 use std::process::Command;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -13,25 +13,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     app.set_unknown_command_handler(|command: &str| {
         if command.starts_with("sudo") {
-            error!(&format!(
+            get_error!(&format!(
                 "Permission denied: could not execute '{}'",
                 command
             ))
         } else if command.len() > 20 {
-            warn!(&format!("Command too long: '{}'", command))
+            get_warn!(&format!("Command too long: '{}'", command))
         } else {
-            warn!(&format!(
+            get_warn!(&format!(
                 "Command '{}' does not exist. Type 'help' to see available commands.",
                 command
             ))
         }
     });
 
-    let startup_message = info!(
+    let startup_message = get_info!(
         "TerminalApp started. Press Ctrl+D or Ctrl+C twice to exit.",
         "Daemon"
     );
-    let exit_message = info!("TerminalApp exiting. Goodbye!", "Daemon");
+    let exit_message = get_info!("TerminalApp exiting. Goodbye!", "Daemon");
 
     app.run(&startup_message, &exit_message)
 }
@@ -51,7 +51,7 @@ fn register_commands(app: &mut TerminalApp) {
                     .arg("dir")
                     .output()
                     .map_or_else(
-                        |e| error!(&format!("Error executing command: {}", e)),
+                        |e| get_error!(&format!("Error executing command: {}", e)),
                         |output| {
                             String::from_utf8_lossy(&output.stdout)
                                 .trim_end()
@@ -60,7 +60,7 @@ fn register_commands(app: &mut TerminalApp) {
                     )
             } else {
                 Command::new("ls").args(args).output().map_or_else(
-                    |e| error!(&format!("Error executing command: {}", e)),
+                    |e| get_error!(&format!("Error executing command: {}", e)),
                     |output| {
                         String::from_utf8_lossy(&output.stdout)
                             .trim_end()
@@ -74,21 +74,21 @@ fn register_commands(app: &mut TerminalApp) {
     app.register_command(
         "help",
         Box::new(|_: &mut TerminalApp, _: &[&str]| -> String {
-            info!("Available commands: 'list', 'help', 'exit', 'debug', 'hello' and 'test'.")
+            get_info!("Available commands: 'list', 'help', 'exit', 'debug', 'hello' and 'test'.")
         }),
     );
 
     app.register_command(
         "exit",
         Box::new(|_: &mut TerminalApp, _: &[&str]| -> String {
-            warn!("Press Ctrl+C(twice to confirm) or Ctrl+D to exit.")
+            get_warn!("Press Ctrl+C(twice to confirm) or Ctrl+D to exit.")
         }),
     );
 
     app.register_command(
         "debug",
         Box::new(|_: &mut TerminalApp, _: &[&str]| -> String {
-            debug!("This is a debug log message.")
+            get_debug!("This is a debug log message.")
         }),
     );
 
@@ -96,9 +96,9 @@ fn register_commands(app: &mut TerminalApp) {
         "hello",
         Box::new(|_: &mut TerminalApp, args: &[&str]| -> String {
             if args.is_empty() {
-                info!("Hello, World!")
+                get_info!("Hello, World!")
             } else {
-                info!(&format!("Hello, {}!", args.join(" ")))
+                get_info!(&format!("Hello, {}!", args.join(" ")))
             }
         }),
     );
@@ -107,9 +107,9 @@ fn register_commands(app: &mut TerminalApp) {
         "test",
         Box::new(|_: &mut TerminalApp, args: &[&str]| -> String {
             if !args.is_empty() {
-                error!("This command rejects arguments!")
+                get_error!("This command rejects arguments!")
             } else {
-                info!("Success!")
+                get_info!("Success!")
             }
         }),
     );
@@ -117,7 +117,10 @@ fn register_commands(app: &mut TerminalApp) {
     app.register_command(
         "crash",
         Box::new(|_: &mut TerminalApp, _: &[&str]| -> String {
-            critical!("Dangerous option!")
+            info!("This command will crash the application.");
+            warn!("Dangerous option!");
+            critical!("Crashing...");
+            panic!("Application crashed intentionally!");
         }),
     );
 }
