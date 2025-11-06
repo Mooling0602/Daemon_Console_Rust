@@ -19,7 +19,7 @@ pub mod logger;
 
 use crossterm::{
     cursor,
-    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
+    event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
     execute,
     terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode},
 };
@@ -169,33 +169,51 @@ impl TerminalApp {
         stdout: &mut Stdout,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         let mut should_quit = false;
-        
+
         if let Event::Key(key_event) = &event {
-            if key_event.kind != crossterm::event::KeyEventKind::Press {
+            // Debugging codes, so fuck you Windows
+            // fyi: https://github.com/crossterm-rs/crossterm/pull/745
+            //
+            // if key_event.kind == KeyEventKind::Press {
+            //     println!("[raw_debug]Key press: {}", key_event.code)
+            // }
+            // if key_event.kind == KeyEventKind::Release {
+            //     println!("[raw_debug]Key release: {}", key_event.code);
+            // }
+            //
+
+            if key_event.kind == KeyEventKind::Press {
                 return Ok(should_quit);
             }
-            
+
             if let Some(last_event) = &self.last_key_event {
-                if last_event.code == key_event.code && 
-                   last_event.modifiers == key_event.modifiers &&
-                   last_event.kind == key_event.kind {
+                if last_event.code == key_event.code
+                    && last_event.modifiers == key_event.modifiers
+                    && last_event.kind == key_event.kind
+                {
                     let is_control_key = match key_event.code {
                         KeyCode::Char('c') if key_event.modifiers == KeyModifiers::CONTROL => true,
                         KeyCode::Char('d') if key_event.modifiers == KeyModifiers::CONTROL => true,
                         _ => false,
                     };
-                    
-                    if is_control_key {
-                        self.last_key_event = Some(*key_event);
-                    } else {
-                        self.last_key_event = Some(*key_event);
+
+                    if !is_control_key {
                         return Ok(should_quit);
                     }
                 }
             }
-            self.last_key_event = Some(*key_event);
+
+            match key_event.code {
+                KeyCode::Char('c') if key_event.modifiers == KeyModifiers::CONTROL => {
+                    self.last_key_event = Some(*key_event);
+                }
+                KeyCode::Char('d') if key_event.modifiers == KeyModifiers::CONTROL => {
+                    self.last_key_event = Some(*key_event);
+                }
+                _ => {}
+            }
         }
-        
+
         if let Event::Key(KeyEvent {
             code, modifiers, ..
         }) = event
@@ -385,7 +403,10 @@ impl TerminalApp {
             self.current_input.clear();
             self.cursor_position = 0;
             self.last_ctrl_c = Some(Instant::now());
-            return Ok((false, get_info!("Input cleared. Press Ctrl+C again to exit.")));
+            return Ok((
+                false,
+                get_info!("Input cleared. Press Ctrl+C again to exit."),
+            ));
         }
         if let Some(last_time) = self.last_ctrl_c
             && last_time.elapsed().as_secs() < 5
