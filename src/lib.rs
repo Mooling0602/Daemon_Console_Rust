@@ -534,7 +534,15 @@ impl TerminalApp {
 
     /// Handles character input by inserting at the cursor position.
     fn handle_char_input(&mut self, c: char) {
-        self.current_input.insert(self.cursor_position, c);
+        let char_count = self.current_input.chars().count();
+
+        if self.cursor_position > char_count {
+            self.cursor_position = char_count;
+        }
+
+        let mut chars: Vec<char> = self.current_input.chars().collect();
+        chars.insert(self.cursor_position, c);
+        self.current_input = chars.into_iter().collect();
         self.cursor_position += 1;
     }
 }
