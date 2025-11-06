@@ -182,7 +182,7 @@ impl TerminalApp {
             // }
             //
 
-            if key_event.kind == KeyEventKind::Press {
+            if key_event.kind == KeyEventKind::Release {
                 return Ok(should_quit);
             }
 
