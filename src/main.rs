@@ -116,11 +116,23 @@ fn register_commands(app: &mut TerminalApp) {
 
     app.register_command(
         "crash",
-        Box::new(|_: &mut TerminalApp, _: &[&str]| -> String {
-            info!("This command will crash the application.");
+        Box::new(|app: &mut TerminalApp, args: &[&str]| -> String {
+            let crash_count = app
+                .command_history
+                .iter()
+                .filter(|&cmd| cmd.trim() == "crash")
+                .count();
+
+            if crash_count > 1 || args.contains(&"--confirm") {
+                warn!("You have confirmed to crash the application.");
+                critical!("Crashing...");
+                panic!("Application crashed intentionally!");
+            }
+
+            // 第一次执行，显示提示信息
+            info!("This command does not crash the application.");
             warn!("Dangerous option!");
-            critical!("Crashing...");
-            panic!("Application crashed intentionally!");
+            get_info!("Type this command again to crash the application.")
         }),
     );
 }
