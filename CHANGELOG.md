@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.2.1]
+### Fix!
+- refactor log system and move it to `TerminalApp`
+
 ## [v0.2.0]
 ### Feat
 - Improve experience:
