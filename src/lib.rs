@@ -87,6 +87,15 @@ impl Default for TerminalApp {
 }
 
 impl TerminalApp {
+    /// Removes a character at a specific index in a string.
+    fn remove_char_at(&mut self, index: usize) {
+        let mut chars: Vec<char> = self.current_input.chars().collect();
+        if index < chars.len() {
+            chars.remove(index);
+            self.current_input = chars.into_iter().collect();
+        }
+    }
+
     /// Creates a new terminal application instance with default settings.
     pub fn new() -> Self {
         Self {
@@ -145,7 +154,7 @@ impl TerminalApp {
     ) -> Result<(), Box<dyn std::error::Error>> {
         enable_raw_mode()?;
         writeln!(stdout, "{}", startup_message)?;
-        self._render_input_line(stdout)?;
+        self.render_input_line(stdout)?;
         Ok(())
     }
 
@@ -229,22 +238,22 @@ impl TerminalApp {
                 }
                 KeyCode::Up => {
                     self.handle_up_key();
-                    self._render_input_line(stdout)?;
+                    self.render_input_line(stdout)?;
                 }
                 KeyCode::Down => {
                     self.handle_down_key();
-                    self._render_input_line(stdout)?;
+                    self.render_input_line(stdout)?;
                 }
                 KeyCode::Left => {
                     if self.cursor_position > 0 {
                         self.cursor_position -= 1;
-                        self._render_input_line(stdout)?;
+                        self.render_input_line(stdout)?;
                     }
                 }
                 KeyCode::Right => {
                     if self.cursor_position < self.current_input.chars().count() {
                         self.cursor_position += 1;
-                        self._render_input_line(stdout)?;
+                        self.render_input_line(stdout)?;
                     }
                 }
                 KeyCode::Enter => {
@@ -252,13 +261,13 @@ impl TerminalApp {
                 }
                 KeyCode::Char(c) => {
                     self.handle_char_input(c);
-                    self._render_input_line(stdout)?;
+                    self.render_input_line(stdout)?;
                 }
                 KeyCode::Backspace => {
                     if self.cursor_position > 0 {
-                        self.current_input.remove(self.cursor_position - 1);
+                        self.remove_char_at(self.cursor_position - 1);
                         self.cursor_position -= 1;
-                        self._render_input_line(stdout)?;
+                        self.render_input_line(stdout)?;
                     }
                 }
                 _ => {}
@@ -344,12 +353,12 @@ impl TerminalApp {
             Clear(ClearType::CurrentLine)
         )?;
         writeln!(stdout, "{}", log_line)?;
-        self._render_input_line(stdout)?;
+        self.render_input_line(stdout)?;
         Ok(())
     }
 
     /// Renders the input line with prompt and cursor positioning.
-    fn _render_input_line(&self, stdout: &mut Stdout) -> Result<(), Box<dyn std::error::Error>> {
+    fn render_input_line(&self, stdout: &mut Stdout) -> Result<(), Box<dyn std::error::Error>> {
         let result = (|| -> Result<(), Box<dyn std::error::Error>> {
             execute!(stdout, cursor::Hide)?;
             execute!(
@@ -485,14 +494,14 @@ impl TerminalApp {
             self.current_input.clear();
             self.cursor_position = 0;
             self.history_index = None;
-            self._render_input_line(stdout)?;
+            self.render_input_line(stdout)?;
         } else {
             execute!(
                 stdout,
                 cursor::MoveToColumn(0),
                 Clear(ClearType::CurrentLine)
             )?;
-            self._render_input_line(stdout)?;
+            self.render_input_line(stdout)?;
         }
         Ok(())
     }
