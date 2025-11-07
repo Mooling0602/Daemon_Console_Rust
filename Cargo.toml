@@ -48,3 +48,10 @@ lto = "thin"
 
 [package.metadata.dist]
 allow-dirty = ["ci"]
+
+[workspace]
+members = ["."]
+
+[workspace.metadata.dist]
+allow-dirty = ["ci"]
+
