@@ -2,6 +2,7 @@
 name = "daemon_console"
 version = "0.2.0"
 edition = "2024"
+rust-version = "1.90.0"
 authors = ["Mooling0602 <CleMooling@outlook.com>"]
 description = "A flexible console for daemon applications."
 repository = "https://github.com/Mooling0602/Daemon_Console_Rust"
@@ -20,6 +21,12 @@ exclude = [
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+[package.metadata.wix]
+upgrade-guid = "650695BD-DEA6-4C09-9489-37B4E402378B"
+path-guid = "5B30BFC3-C0FC-4690-91DB-E6399D2F8638"
+license = false
+eula = false
 
 [dependencies]
 crossterm = "0.29.0"
