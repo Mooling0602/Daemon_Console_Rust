@@ -3,7 +3,9 @@
 //! This application provides a terminal interface with registered example commands
 //! including 'list', 'help', 'exit', 'debug', 'hello', and 'test'.
 
-use daemon_console::{TerminalApp, critical, get_debug, get_error, get_info, get_warn, info, warn};
+use crossterm::terminal::disable_raw_mode;
+use daemon_console::{TerminalApp, get_debug, get_error, get_info, get_warn};
+use std::io::{Write, stdout};
 use std::process::Command;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -124,14 +126,17 @@ fn register_commands(app: &mut TerminalApp) {
                 .count();
 
             if crash_count > 1 || args.contains(&"--confirm") {
-                warn!("You have confirmed to crash the application.");
-                critical!("Crashing...");
+                let mut stdout = stdout();
+                app.warn("You have confirmed to crash the application.");
+                app.critical("Crashing...");
+                disable_raw_mode().expect("");
+                stdout.flush().expect("");
                 panic!("Application crashed intentionally!");
             }
 
             // 第一次执行，显示提示信息
-            info!("This command does not crash the application.");
-            warn!("Dangerous option!");
+            app.info("This command does not crash the application.");
+            app.warn("Dangerous option!");
             get_info!("Type this command again to crash the application.")
         }),
     );

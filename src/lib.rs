@@ -554,4 +554,75 @@ impl TerminalApp {
         self.current_input = chars.into_iter().collect();
         self.cursor_position += 1;
     }
+
+    /// Log info-level messages.
+    ///
+    /// This method ensures proper terminal line management by clearing the current
+    /// input line, printing the log message, and then re-rendering the input line.
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - The message content to be logged.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use daemon_console::TerminalApp;
+    ///
+    /// let mut app = TerminalApp::new();
+    /// app.info("Application started successfully!")
+    /// app.info("Running tasks...")
+    /// ```
+    pub fn info(&mut self, message: &str) {
+        let mut stdout = stdout();
+        let _ = self.print_log_entry(&mut stdout, &*get_info!(message));
+    }
+
+    /// Log warn-level messages.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use daemon_console::TerminalApp;
+    ///
+    /// let mut app = TerminalApp::new();
+    /// app.warn("Application started successfully!")
+    /// app.warn("Running tasks...")
+    /// ```
+    pub fn warn(&mut self, message: &str) {
+        let mut stdout = stdout();
+        let _ = self.print_log_entry(&mut stdout, &*get_warn!(message));
+    }
+
+    /// Log error-level messages.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use daemon_console::TerminalApp;
+    ///
+    /// let mut app = TerminalApp::new();
+    /// app.error("Application started successfully!")
+    /// app.error("Running tasks...")
+    /// ```
+    pub fn error(&mut self, message: &str) {
+        let mut stdout = stdout();
+        let _ = self.print_log_entry(&mut stdout, &*get_error!(message));
+    }
+
+    /// Log critical-level messages.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use daemon_console::TerminalApp;
+    ///
+    /// let mut app = TerminalApp::new();
+    /// app.critical("Application started successfully!")
+    /// app.critical("Running tasks...")
+    /// ```
+    pub fn critical(&mut self, message: &str) {
+        let mut stdout = stdout();
+        let _ = self.print_log_entry(&mut stdout, &*get_critical!(message));
+    }
 }
