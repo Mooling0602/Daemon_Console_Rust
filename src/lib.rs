@@ -5,13 +5,16 @@
 //!
 //! # Examples
 //!
+//! A simple way to create a `TerminalApp` instance.
+//!
 //! ```rust
 //! use daemon_console::TerminalApp;
+//! use std::io::stdout;
 //!
 //! let mut app = TerminalApp::new();
-//! // Register commands and run
-//! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
+//!
+//! See more details in `src/main.rs` in source code.
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
@@ -568,10 +571,15 @@ impl TerminalApp {
     ///
     /// ```
     /// use daemon_console::TerminalApp;
+    /// use std::io::stdout;
     ///
-    /// let mut app = TerminalApp::new();
-    /// app.info("Application started successfully!")
-    /// app.info("Running tasks...")
+    /// fn main() {
+    ///     let mut app = TerminalApp::new();
+    ///     // let mut stdout = stdout();
+    ///     app.info("Application started successfully!");
+    ///     app.info("Running tasks...");
+    ///     // app.shutdown_terminal(&mut stdout, "ok");
+    /// }
     /// ```
     pub fn info(&mut self, message: &str) {
         let mut stdout = stdout();
@@ -585,9 +593,11 @@ impl TerminalApp {
     /// ```
     /// use daemon_console::TerminalApp;
     ///
-    /// let mut app = TerminalApp::new();
-    /// app.warn("Application started successfully!")
-    /// app.warn("Running tasks...")
+    /// fn main() {
+    ///     let mut app = TerminalApp::new();
+    ///     app.warn("You get a warning!");
+    ///     app.warn("Continue running...");
+    /// }
     /// ```
     pub fn warn(&mut self, message: &str) {
         let mut stdout = stdout();
@@ -601,9 +611,11 @@ impl TerminalApp {
     /// ```
     /// use daemon_console::TerminalApp;
     ///
-    /// let mut app = TerminalApp::new();
-    /// app.error("Application started successfully!")
-    /// app.error("Running tasks...")
+    /// fn main() {
+    ///     let mut app = TerminalApp::new();
+    ///     app.error("An error occurred!");
+    ///     app.error("Failed to run tasks.");
+    /// }
     /// ```
     pub fn error(&mut self, message: &str) {
         let mut stdout = stdout();
@@ -617,9 +629,11 @@ impl TerminalApp {
     /// ```
     /// use daemon_console::TerminalApp;
     ///
-    /// let mut app = TerminalApp::new();
-    /// app.critical("Application started successfully!")
-    /// app.critical("Running tasks...")
+    /// fn main() {
+    ///     let mut app = TerminalApp::new();
+    ///     app.critical("Application crashed!");
+    ///     app.critical("Exception: unknown.");
+    /// }
     /// ```
     pub fn critical(&mut self, message: &str) {
         let mut stdout = stdout();
