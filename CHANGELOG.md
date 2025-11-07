@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.2.0]
+## [v0.2.0]
 ### Feat
 - Improve experience:
 - fix: Cross platform enhancement
