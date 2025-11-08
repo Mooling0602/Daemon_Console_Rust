@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.0
+### Feat
+- Async features.
+
 ## v0.2.2
 ### Chore
 - Fix doc and pass test.

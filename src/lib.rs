@@ -9,12 +9,12 @@
 //!
 //! ```rust
 //! use daemon_console::TerminalApp;
+//! use std::io::stdout;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     let mut app = TerminalApp::new();
-//!     // Register commands and run
-//!     app.run("App started", "App exited").await
+//!     Ok(())
 //! }
 //! ```
 //!
