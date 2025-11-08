@@ -571,7 +571,6 @@ impl TerminalApp {
     ///
     /// ```
     /// use daemon_console::TerminalApp;
-    /// use std::io::stdout;
     ///
     /// fn main() {
     ///     let mut app = TerminalApp::new();
