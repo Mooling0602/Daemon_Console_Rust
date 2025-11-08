@@ -9,7 +9,6 @@
 //!
 //! ```rust
 //! use daemon_console::TerminalApp;
-//! use std::io::stdout;
 //!
 //! let mut app = TerminalApp::new();
 //! ```
