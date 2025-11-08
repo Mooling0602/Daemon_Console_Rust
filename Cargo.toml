@@ -10,7 +10,7 @@ homepage = "https://crates.io/crates/daemon_console"
 license = "GPL-3.0"
 readme = "README.md"
 documentation = "https://docs.rs/daemon_console"
-keywords = ["console", "daemon", "terminal", "cli"]
+keywords = ["console", "daemon", "terminal", "tui"]
 categories = ["command-line-utilities", "command-line-interface"]
 exclude = [
     "target/",
@@ -29,7 +29,6 @@ chrono = "0.4.42"
 tokio = { version = "1.48.0", features = ["full"] }
 futures = "0.3.31"
 async-trait = "0.1.89"
-brigadier_rs = "0.2.0"
 
 [lib]
 name = "daemon_console"

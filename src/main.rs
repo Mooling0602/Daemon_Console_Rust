@@ -4,9 +4,8 @@
 //! including 'list', 'help', 'exit', 'debug', 'hello', 'test', and async commands like 'sleep'.
 
 use async_trait::async_trait;
-use daemon_console::{AsyncCommandHandler, TerminalApp, critical, debug, error, info, warn};
 use crossterm::terminal::disable_raw_mode;
-use daemon_console::{get_debug, get_error, get_info, get_warn};
+use daemon_console::{AsyncCommandHandler, TerminalApp, get_debug, get_error, get_info, get_warn};
 use std::io::{Write, stdout};
 use std::process::Command;
 use std::time::Duration;
@@ -51,15 +50,17 @@ struct SleepCommand;
 impl AsyncCommandHandler for SleepCommand {
     async fn execute_async(&mut self, _app: &mut TerminalApp, args: &[&str]) -> String {
         if args.is_empty() {
-            return error!("Usage: sleep <seconds>");
+            return get_error!("Usage: sleep <seconds>");
         }
 
         match args[0].parse::<u64>() {
             Ok(seconds) => {
                 sleep(Duration::from_secs(seconds)).await;
-                info!(&format!("Finished sleeping for {} seconds!", seconds))
+                get_info!(&format!("Finished sleeping for {} seconds!", seconds))
             }
-            Err(_) => error!("Invalid number format. Please provide a valid number of seconds."),
+            Err(_) => {
+                get_error!("Invalid number format. Please provide a valid number of seconds.")
+            }
         }
     }
 
@@ -115,7 +116,7 @@ async fn register_commands(app: &mut TerminalApp) {
         "exit",
         Box::new(|app: &mut TerminalApp, _: &[&str]| -> String {
             app.should_exit = true;
-            warn!("Exiting application by command 'exit'...")
+            get_warn!("Exiting application by command 'exit'...")
         }),
     );
 

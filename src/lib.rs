@@ -496,10 +496,7 @@ impl TerminalApp {
     }
 
     /// Renders the input line with prompt and cursor positioning.
-    fn render_input_line(
-        &mut self,
-        stdout: &mut Stdout,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn render_input_line(&mut self, stdout: &mut Stdout) -> Result<(), Box<dyn std::error::Error>> {
         let result = (|| -> Result<(), Box<dyn std::error::Error>> {
             execute!(stdout, cursor::Hide)?;
             self.clear_input_line(stdout)?;
@@ -668,7 +665,7 @@ impl TerminalApp {
                             .insert(cmd_name.to_string(), CommandHandlerType::Sync(sync_handler));
                         result
                     } else {
-                        error!("Internal error: sync handler not found")
+                        get_error!("Internal error: sync handler not found")
                     }
                 }
                 CommandHandlerType::Async(async_handler) => {
@@ -679,13 +676,13 @@ impl TerminalApp {
                         .await
                     {
                         Ok(_) => {
-                            info!(&format!(
+                            get_info!(&format!(
                                 "Async command '{}' started in the background",
                                 cmd_name
                             ))
                         }
                         Err(e) => {
-                            error!(&format!("Failed to spawn async command: {}", e))
+                            get_error!(&format!("Failed to spawn async command: {}", e))
                         }
                     }
                 }
