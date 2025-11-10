@@ -34,10 +34,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     let startup_message = get_info!(
-        "TerminalApp started with async support. Press Ctrl+D or Ctrl+C twice to exit.",
-        "Daemon"
+        "Running in async mode (v0.3.0+). Press Ctrl+D or Ctrl+C twice to exit.",
+        "Daemon Console"
     );
-    let exit_message = get_info!("TerminalApp exiting. Goodbye!", "Daemon");
+    let exit_message = "Daemon Console exiting. Goodbye!";
 
     app.run(&startup_message, &exit_message).await
 }
@@ -50,16 +50,22 @@ struct SleepCommand;
 impl AsyncCommandHandler for SleepCommand {
     async fn execute_async(&mut self, _app: &mut TerminalApp, args: &[&str]) -> String {
         if args.is_empty() {
-            return get_error!("Usage: sleep <seconds>");
+            return get_error!("Usage: sleep <seconds>", "CommandHelp");
         }
 
         match args[0].parse::<u64>() {
             Ok(seconds) => {
                 sleep(Duration::from_secs(seconds)).await;
-                get_info!(&format!("Finished sleeping for {} seconds!", seconds))
+                get_info!(
+                    &format!("Finished sleeping for {} seconds!", seconds),
+                    "CommandResp"
+                )
             }
             Err(_) => {
-                get_error!("Invalid number format. Please provide a valid number of seconds.")
+                get_error!(
+                    "Invalid number format. Please provide a valid number of seconds.",
+                    "CommandResp"
+                )
             }
         }
     }
@@ -85,7 +91,7 @@ async fn register_commands(app: &mut TerminalApp) {
                     .arg("dir")
                     .output()
                     .map_or_else(
-                        |e| get_error!(&format!("Error executing command: {}", e)),
+                        |e| get_error!(&format!("Error executing command: {}", e), "CommandResp"),
                         |output| {
                             String::from_utf8_lossy(&output.stdout)
                                 .trim_end()
@@ -94,7 +100,7 @@ async fn register_commands(app: &mut TerminalApp) {
                     )
             } else {
                 Command::new("ls").args(args).output().map_or_else(
-                    |e| get_error!(&format!("Error executing command: {}", e)),
+                    |e| get_error!(&format!("Error executing command: {}", e), "CommandResp"),
                     |output| {
                         String::from_utf8_lossy(&output.stdout)
                             .trim_end()
@@ -108,7 +114,7 @@ async fn register_commands(app: &mut TerminalApp) {
     app.register_command(
         "help",
         Box::new(|_: &mut TerminalApp, _: &[&str]| -> String {
-            get_info!("Available commands:\n  Sync: 'list', 'help', 'exit', 'debug', 'hello', 'test', 'crash'\n  Async (non-blocking): 'wait <seconds>'\nAsync commands run in the background - you can continue typing while they execute!")
+            get_info!("Available commands:\n  Sync: 'list', 'help', 'exit', 'debug', 'hello', 'test', 'crash'\n  Async (non-blocking): 'wait <seconds>'\nAsync commands run in the background - you can continue typing while they execute!", "CommandHelp")
         }),
     );
 
@@ -116,14 +122,14 @@ async fn register_commands(app: &mut TerminalApp) {
         "exit",
         Box::new(|app: &mut TerminalApp, _: &[&str]| -> String {
             app.should_exit = true;
-            get_warn!("Exiting application by command 'exit'...")
+            get_warn!("Exiting application by command 'exit'...", "CommandResp")
         }),
     );
 
     app.register_command(
         "debug",
         Box::new(|_: &mut TerminalApp, _: &[&str]| -> String {
-            get_debug!("This is a debug log message.")
+            get_debug!("This is a debug log message.", "CommandResp")
         }),
     );
 
@@ -131,9 +137,9 @@ async fn register_commands(app: &mut TerminalApp) {
         "hello",
         Box::new(|_: &mut TerminalApp, args: &[&str]| -> String {
             if args.is_empty() {
-                get_info!("Hello, World!")
+                get_info!("Hello, World!", "CommandResp")
             } else {
-                get_info!(&format!("Hello, {}!", args.join(" ")))
+                get_info!(&format!("Hello, {}!", args.join(" ")), "CommandResp")
             }
         }),
     );
@@ -142,9 +148,9 @@ async fn register_commands(app: &mut TerminalApp) {
         "test",
         Box::new(|_: &mut TerminalApp, args: &[&str]| -> String {
             if !args.is_empty() {
-                get_error!("This command rejects arguments!")
+                get_error!("This command rejects arguments!", "CommandResp")
             } else {
-                get_info!("Success!")
+                get_info!("Success!", "CommandResp")
             }
         }),
     );
@@ -167,10 +173,12 @@ async fn register_commands(app: &mut TerminalApp) {
                 panic!("Application crashed intentionally!");
             }
 
-            // 第一次执行，显示提示信息
             app.info("This command does not crash the application.");
             app.warn("Dangerous option!");
-            get_info!("Type this command again to crash the application.")
+            get_info!(
+                "Type this command again to crash the application.",
+                "CommandResp"
+            )
         }),
     );
 

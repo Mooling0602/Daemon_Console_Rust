@@ -27,7 +27,7 @@ pub mod logger;
 use async_trait::async_trait;
 use crossterm::{
     cursor,
-    event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, poll},
+    event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, poll, EnableMouseCapture, DisableMouseCapture},
     execute,
     terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode},
 };
@@ -38,6 +38,25 @@ use std::time::Instant;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use unicode_width::UnicodeWidthChar;
+
+/// Actions that can be sent from async commands to the main application
+pub enum AppAction {
+    /// Register a new command: (command_name, handler)
+    RegisterCommand(String, Box<dyn CommandHandler>),
+}
+
+impl std::fmt::Debug for AppAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AppAction::RegisterCommand(name, _) => {
+                f.debug_struct("RegisterCommand")
+                    .field("name", name)
+                    .field("handler", &"Box<dyn CommandHandler>")
+                    .finish()
+            }
+        }
+    }
+}
 
 /// Type alias for custom unknown command handlers.
 type UnknownCommandHandler = Box<dyn Fn(&str) -> String + Send + Sync + 'static>;
@@ -141,6 +160,7 @@ pub struct TerminalApp {
     command_result_tx: Option<mpsc::UnboundedSender<CommandResult>>,
     running_commands: Vec<RunningCommand>,
     last_key_event: Option<KeyEvent>,
+    pub action_sender: Option<mpsc::UnboundedSender<AppAction>>,
 }
 
 impl Default for TerminalApp {
@@ -176,6 +196,7 @@ impl TerminalApp {
             command_result_tx: Some(tx),
             running_commands: Vec::new(),
             last_key_event: None,
+            action_sender: None,
         }
     }
 
@@ -203,6 +224,15 @@ impl TerminalApp {
     ) {
         self.commands
             .insert(name.into(), CommandHandlerType::Async(handler));
+    }
+
+    /// Sets the action sender for communication with async commands
+    /// 
+    /// # Arguments
+    /// 
+    /// * `sender` - The sender to use for sending actions from async commands
+    pub(crate) fn set_action_sender(&mut self, sender: mpsc::UnboundedSender<AppAction>) {
+        self.action_sender = Some(sender);
     }
 
     /// Sets a custom handler for unknown commands (synchronous).
@@ -251,8 +281,16 @@ impl TerminalApp {
         startup_message: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
         enable_raw_mode()?;
-        writeln!(stdout, "{}", startup_message)?;
-        self.render_input_line(stdout)?;
+        execute!(
+            stdout,
+            EnableMouseCapture,
+            cursor::Hide
+        )?;
+
+        if !startup_message.is_empty() {
+            self.print_log_entry(stdout, startup_message).await?;
+        }
+
         Ok(())
     }
 
@@ -398,65 +436,94 @@ impl TerminalApp {
         Ok(())
     }
 
-    /// Convenience method that runs the complete terminal application lifecycle.
+    /// Main application loop that handles terminal input and command execution.
     ///
-    /// This method encapsulates initialization, event loop, and shutdown.
+    /// Initializes terminal event handling, processes keyboard input, and manages
+    /// command execution until exit is requested. Handles special key combinations
+    /// like Ctrl+C for graceful shutdown.
     ///
     /// # Arguments
     ///
-    /// * `startup_message` - Message to display on startup
-    /// * `exit_message` - Message to display on exit
+    /// * `startup_message` - Optional message to display on startup
+    /// * `exit_message` - Optional message to display on exit
     ///
     /// # Errors
     ///
-    /// Returns an error if any part of the application lifecycle fails.
+    /// Returns an error if terminal initialization or event handling fails.
     pub async fn run(
         &mut self,
         startup_message: &str,
         exit_message: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut stdout = stdout();
-        self.init_terminal(&mut stdout, startup_message).await?;
+        // Create channel for AppAction messages
+        let (action_tx, mut action_rx) = mpsc::unbounded_channel::<AppAction>();
+        self.set_action_sender(action_tx.clone());
+        
+        enable_raw_mode()?;
+        let mut stdout_handle = stdout();
+        // 移除备用屏幕操作，直接在当前屏幕操作
+        execute!(
+            stdout_handle,
+            EnableMouseCapture,
+            cursor::Hide
+        )?;
 
-        let mut rx = self.command_result_rx.take().unwrap();
+        if !startup_message.is_empty() {
+            self.print_log_entry(&mut stdout_handle, startup_message).await?;
+        }
 
-        let result = async {
-            loop {
-                tokio::select! {
-                    // Handle terminal events (non-blocking)
-                    _ = tokio::time::sleep(tokio::time::Duration::from_millis(50)) => {
-                        // Check if events are available without blocking
-                        if poll(std::time::Duration::from_millis(0))? {
-                            if let Ok(event) = event::read() {
-                                if self.process_event(event, &mut stdout).await? {
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    // Handle completed async commands
-                    Some(result) = rx.recv() => {
-                        self.handle_command_result(result, &mut stdout).await?;
-                    }
-
-                    // Check for completed running commands
-                    _ = tokio::time::sleep(tokio::time::Duration::from_millis(100)) => {
-                        self.check_running_commands(&mut stdout).await?;
+        loop {
+            // Handle AppAction messages
+            while let Ok(action) = action_rx.try_recv() {
+                match action {
+                    AppAction::RegisterCommand(name, handler) => {
+                        self.register_command(name, handler);
                     }
                 }
             }
-            Ok::<(), Box<dyn std::error::Error>>(())
-        }
-        .await;
 
-        // Cancel any remaining running commands
-        for cmd in &self.running_commands {
-            cmd.handle.abort();
+            // Check for completed async commands
+            self.check_running_commands(&mut stdout_handle).await?;
+
+            // Process command results
+            if let Some(ref mut rx) = self.command_result_rx {
+                if let Ok(result) = rx.try_recv() {
+                    self.handle_command_result(result, &mut stdout_handle).await?;
+                }
+            }
+
+            // Handle terminal events (non-blocking)
+            tokio::select! {
+                _ = tokio::time::sleep(tokio::time::Duration::from_millis(50)) => {
+                    // Check if events are available without blocking
+                    if poll(std::time::Duration::from_millis(0))? {
+                        if let Ok(event) = event::read() {
+                            if self.process_event(event, &mut stdout_handle).await? {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if self.should_exit {
+                break;
+            }
         }
 
-        self.shutdown_terminal(&mut stdout, exit_message).await?;
-        result
+        disable_raw_mode()?;
+        // 移除离开备用屏幕操作，保留当前屏幕内容
+        execute!(
+            stdout_handle,
+            DisableMouseCapture,
+            cursor::Show
+        )?;
+
+        if !exit_message.is_empty() {
+            println!("{}", exit_message);
+        }
+
+        Ok(())
     }
 
     /// Clear the current input line and re-renders it.
@@ -728,15 +795,15 @@ impl TerminalApp {
     ///
     /// fn main() {
     ///     let mut app = TerminalApp::new();
-    ///     // let mut stdout = stdout();
+    ///     // let mut stdout_handle = stdout();
     ///     app.info("Application started successfully!");
     ///     app.info("Running tasks...");
-    ///     // app.shutdown_terminal(&mut stdout, "ok");
+    ///     // app.shutdown_terminal(&mut stdout_handle, "ok");
     /// }
     /// ```
     pub fn info(&mut self, message: &str) {
-        let mut stdout = stdout();
-        let _ = self.print_log_entry(&mut stdout, &*get_info!(message));
+        let mut stdout_handle = stdout();
+        let _ = self.print_log_entry(&mut stdout_handle, &*get_info!(message));
     }
 
     /// Log warn-level messages.
@@ -748,13 +815,14 @@ impl TerminalApp {
     ///
     /// fn main() {
     ///     let mut app = TerminalApp::new();
+    ///     // let mut stdout_handle = stdout();
     ///     app.warn("You get a warning!");
     ///     app.warn("Continue running...");
     /// }
     /// ```
     pub fn warn(&mut self, message: &str) {
-        let mut stdout = stdout();
-        let _ = self.print_log_entry(&mut stdout, &*get_warn!(message));
+        let mut stdout_handle = stdout();
+        let _ = self.print_log_entry(&mut stdout_handle, &*get_warn!(message));
     }
 
     /// Log error-level messages.
@@ -771,8 +839,8 @@ impl TerminalApp {
     /// }
     /// ```
     pub fn error(&mut self, message: &str) {
-        let mut stdout = stdout();
-        let _ = self.print_log_entry(&mut stdout, &*get_error!(message));
+        let mut stdout_handle = stdout();
+        let _ = self.print_log_entry(&mut stdout_handle, &*get_error!(message));
     }
 
     /// Log critical-level messages.
@@ -789,8 +857,8 @@ impl TerminalApp {
     /// }
     /// ```
     pub fn critical(&mut self, message: &str) {
-        let mut stdout = stdout();
-        let _ = self.print_log_entry(&mut stdout, &*get_critical!(message));
+        let mut stdout_handle = stdout();
+        let _ = self.print_log_entry(&mut stdout_handle, &*get_critical!(message));
     }
 
     /// Handles completed command results from async commands
@@ -841,10 +909,16 @@ impl TerminalApp {
         let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
         let tx = self.command_result_tx.as_ref().unwrap().clone();
         let cmd_copy = command.clone();
+        // 克隆action_sender以便传递给异步命令
+        let action_sender = self.action_sender.clone();
 
         let handle = tokio::spawn(async move {
             // Create a temporary app instance for the async command
             let mut temp_app = TerminalApp::new();
+            // 设置action_sender到临时实例中
+            if let Some(sender) = action_sender {
+                temp_app.set_action_sender(sender);
+            }
             let args_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
             let result = handler.execute_async(&mut temp_app, &args_refs).await;
 

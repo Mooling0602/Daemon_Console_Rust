@@ -38,6 +38,10 @@ path = "src/lib.rs"
 name = "daemon_console"
 path = "src/main.rs"
 
+[[example]]
+name = "demo"
+path = "demo/main.rs"
+
 # The profile that 'dist' will build with
 [profile.dist]
 inherits = "release"
