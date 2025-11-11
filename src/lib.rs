@@ -797,15 +797,13 @@ impl TerminalApp {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// use daemon_console::TerminalApp;
     ///
-    /// async fn main() {
+    /// fn main() {
     ///     let mut app = TerminalApp::new();
-    ///     // let mut stdout_handle = stdout();
-    ///     app.info("Application started successfully!").await;
-    ///     app.info("Running tasks...").await;
-    ///     // app.shutdown_terminal(&mut stdout_handle, "ok");
+    ///     app.info("Application started successfully!");
+    ///     app.info("Running tasks...");
     /// }
     /// ```
     pub fn info(&mut self, message: &str) {
@@ -838,7 +836,6 @@ impl TerminalApp {
     ///
     /// fn main() {
     ///     let mut app = TerminalApp::new();
-    ///     // let mut stdout_handle = stdout();
     ///     app.warn("You get a warning!");
     ///     app.warn("Continue running...");
     /// }
