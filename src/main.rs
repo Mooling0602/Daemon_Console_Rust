@@ -19,10 +19,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     app.set_unknown_command_handler(|command: &str| {
         if command.starts_with("sudo") {
-            get_error!(&format!(
-                "Permission denied: could not execute '{}'",
-                command
-            ))
+            get_error!(
+                &format!("Permission denied: could not execute '{}'", command),
+                "CommandResp"
+            )
         } else if command.len() > 20 {
             get_warn!(&format!("Command too long: '{}'", command))
         } else {
