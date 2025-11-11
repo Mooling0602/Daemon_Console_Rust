@@ -50,7 +50,8 @@ struct SleepCommand;
 impl AsyncCommandHandler for SleepCommand {
     async fn execute_async(&mut self, app: &mut TerminalApp, args: &[&str]) -> String {
         if args.is_empty() {
-            return get_error!("Usage: wait <seconds>", "CommandHelp");
+            app.info("This command is used to test async features.");
+            return get_info!("Usage: wait <seconds>", "CommandHelp");
         }
 
         match args[0].parse::<u64>() {
@@ -85,8 +86,9 @@ async fn register_commands(app: &mut TerminalApp) {
     // Synchronous commands
     app.register_command(
         "list",
-        Box::new(|_app: &mut TerminalApp, args: &[&str]| -> String {
+        Box::new(|app: &mut TerminalApp, args: &[&str]| -> String {
             if cfg!(target_os = "windows") {
+                app.info("Detected Windows system, using 'dir' command.");
                 Command::new("cmd")
                     .arg("/C")
                     .arg("dir")
@@ -100,6 +102,7 @@ async fn register_commands(app: &mut TerminalApp) {
                         },
                     )
             } else {
+                app.info("Seems system is Unix-like, using 'ls' command.");
                 Command::new("ls").args(args).output().map_or_else(
                     |e| get_error!(&format!("Error executing command: {}", e), "CommandResp"),
                     |output| {
