@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.1
+### Fix
+- (commit 2883ba2, b86c60b) Improve example commands in src/main.rs and demo/main.rs
+- (commit e02ac3b) Make `TerminalApp::print_log_entry` sync
+
 ## v0.3.0
 ### Feat
 - Async features.
