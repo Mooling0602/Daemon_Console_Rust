@@ -27,7 +27,10 @@ pub mod logger;
 use async_trait::async_trait;
 use crossterm::{
     cursor,
-    event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, poll, EnableMouseCapture, DisableMouseCapture},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind,
+        KeyModifiers, poll,
+    },
     execute,
     terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode},
 };
@@ -48,12 +51,11 @@ pub enum AppAction {
 impl std::fmt::Debug for AppAction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AppAction::RegisterCommand(name, _) => {
-                f.debug_struct("RegisterCommand")
-                    .field("name", name)
-                    .field("handler", &"Box<dyn CommandHandler>")
-                    .finish()
-            }
+            AppAction::RegisterCommand(name, _) => f
+                .debug_struct("RegisterCommand")
+                .field("name", name)
+                .field("handler", &"Box<dyn CommandHandler>")
+                .finish(),
         }
     }
 }
@@ -147,6 +149,7 @@ where
 /// - Configurable unknown command handling
 /// - Non-blocking async command execution
 pub struct TerminalApp {
+    pub stdout_handle: Stdout,
     pub command_history: Vec<String>,
     pub current_input: String,
     pub history_index: Option<usize>,
@@ -183,6 +186,7 @@ impl TerminalApp {
     pub fn new() -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
         Self {
+            stdout_handle: stdout(),
             command_history: Vec::new(),
             current_input: String::new(),
             history_index: None,
@@ -227,9 +231,9 @@ impl TerminalApp {
     }
 
     /// Sets the action sender for communication with async commands
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `sender` - The sender to use for sending actions from async commands
     pub(crate) fn set_action_sender(&mut self, sender: mpsc::UnboundedSender<AppAction>) {
         self.action_sender = Some(sender);
@@ -269,7 +273,6 @@ impl TerminalApp {
     ///
     /// # Arguments
     ///
-    /// * `stdout` - Mutable reference to standard output
     /// * `startup_message` - Message to display on startup
     ///
     /// # Errors
@@ -277,20 +280,31 @@ impl TerminalApp {
     /// Returns an error if terminal initialization fails.
     pub async fn init_terminal(
         &mut self,
-        stdout: &mut Stdout,
         startup_message: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        enable_raw_mode()?;
-        execute!(
-            stdout,
-            EnableMouseCapture,
-            cursor::Hide
-        )?;
+        self.setup_terminal()?;
 
         if !startup_message.is_empty() {
-            self.print_log_entry(stdout, startup_message).await?;
+            self.print_startup_message(startup_message).await?;
         }
 
+        Ok(())
+    }
+
+    /// 设置终端模式和鼠标捕获
+    fn setup_terminal(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        enable_raw_mode()?;
+        execute!(&mut self.stdout_handle, EnableMouseCapture, cursor::Hide)?;
+        self.stdout_handle.flush()?;
+        Ok(())
+    }
+
+    async fn print_startup_message(
+        &mut self,
+        message: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        writeln!(self.stdout_handle, "{}", message)?;
+        self.stdout_handle.flush()?;
         Ok(())
     }
 
@@ -311,7 +325,6 @@ impl TerminalApp {
     pub async fn process_event(
         &mut self,
         event: Event,
-        stdout: &mut Stdout,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         let mut should_quit = false;
 
@@ -370,43 +383,43 @@ impl TerminalApp {
                 KeyCode::Char('c') if modifiers == KeyModifiers::CONTROL => {
                     let (quit, message) = self.handle_ctrl_c().await?;
                     should_quit = quit;
-                    self.print_log_entry(stdout, &message).await?;
+                    self.print_log_entry(&message);
                 }
                 KeyCode::Up => {
                     self.handle_up_key();
-                    self.render_input_line(stdout)?;
+                    self.render_input_line()?;
                 }
                 KeyCode::Down => {
                     self.handle_down_key();
-                    self.render_input_line(stdout)?;
+                    self.render_input_line()?;
                 }
                 KeyCode::Left => {
                     if self.cursor_position > 0 {
                         self.cursor_position -= 1;
-                        self.render_input_line(stdout)?;
+                        self.render_input_line()?;
                     }
                 }
                 KeyCode::Right => {
                     if self.cursor_position < self.current_input.chars().count() {
                         self.cursor_position += 1;
-                        self.render_input_line(stdout)?;
+                        self.render_input_line()?;
                     }
                 }
                 KeyCode::Enter => {
-                    let should_exit = self.handle_enter_key(stdout, "> ").await?;
+                    let should_exit = self.handle_enter_key("> ").await?;
                     if should_exit {
                         return Ok(true);
                     }
                 }
                 KeyCode::Char(c) => {
                     self.handle_char_input(c);
-                    self.render_input_line(stdout)?;
+                    self.render_input_line()?;
                 }
                 KeyCode::Backspace => {
                     if self.cursor_position > 0 {
                         self.remove_char_at(self.cursor_position - 1);
                         self.cursor_position -= 1;
-                        self.render_input_line(stdout)?;
+                        self.render_input_line()?;
                     }
                 }
                 _ => {}
@@ -427,12 +440,11 @@ impl TerminalApp {
     /// Returns an error if terminal shutdown fails.
     pub async fn shutdown_terminal(
         &mut self,
-        stdout: &mut Stdout,
         exit_message: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
         disable_raw_mode()?;
-        writeln!(stdout, "{}", exit_message)?;
-        stdout.flush()?;
+        writeln!(self.stdout_handle, "{}", exit_message)?;
+        self.stdout_handle.flush()?;
         Ok(())
     }
 
@@ -458,18 +470,12 @@ impl TerminalApp {
         // Create channel for AppAction messages
         let (action_tx, mut action_rx) = mpsc::unbounded_channel::<AppAction>();
         self.set_action_sender(action_tx.clone());
-        
+
         enable_raw_mode()?;
-        let mut stdout_handle = stdout();
-        // 移除备用屏幕操作，直接在当前屏幕操作
-        execute!(
-            stdout_handle,
-            EnableMouseCapture,
-            cursor::Hide
-        )?;
+        execute!(self.stdout_handle, EnableMouseCapture, cursor::Hide)?;
 
         if !startup_message.is_empty() {
-            self.print_log_entry(&mut stdout_handle, startup_message).await?;
+            self.print_log_entry(startup_message);
         }
 
         loop {
@@ -483,12 +489,12 @@ impl TerminalApp {
             }
 
             // Check for completed async commands
-            self.check_running_commands(&mut stdout_handle).await?;
+            self.check_running_commands().await?;
 
             // Process command results
             if let Some(ref mut rx) = self.command_result_rx {
                 if let Ok(result) = rx.try_recv() {
-                    self.handle_command_result(result, &mut stdout_handle).await?;
+                    self.handle_command_result(result).await?;
                 }
             }
 
@@ -498,7 +504,7 @@ impl TerminalApp {
                     // Check if events are available without blocking
                     if poll(std::time::Duration::from_millis(0))? {
                         if let Ok(event) = event::read() {
-                            if self.process_event(event, &mut stdout_handle).await? {
+                            if self.process_event(event).await? {
                                 break;
                             }
                         }
@@ -512,12 +518,7 @@ impl TerminalApp {
         }
 
         disable_raw_mode()?;
-        // 移除离开备用屏幕操作，保留当前屏幕内容
-        execute!(
-            stdout_handle,
-            DisableMouseCapture,
-            cursor::Show
-        )?;
+        execute!(self.stdout_handle, DisableMouseCapture, cursor::Show)?;
 
         if !exit_message.is_empty() {
             println!("{}", exit_message);
@@ -527,16 +528,12 @@ impl TerminalApp {
     }
 
     /// Clear the current input line and re-renders it.
-    pub fn clear_input_line(
-        &mut self,
-        stdout: &mut Stdout,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        execute!(
-            stdout,
+    pub fn clear_input_line(&mut self) {
+        let _ = execute!(
+            self.stdout_handle,
             cursor::MoveToColumn(0),
             Clear(ClearType::CurrentLine)
-        )?;
-        Ok(())
+        );
     }
 
     /// Prints a log entry while preserving the input line.
@@ -551,24 +548,20 @@ impl TerminalApp {
     /// # Errors
     ///
     /// Returns an error if writing to stdout fails.
-    pub async fn print_log_entry(
-        &mut self,
-        stdout: &mut Stdout,
-        log_line: &str,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        self.clear_input_line(stdout)?;
-        writeln!(stdout, "{}", log_line)?;
-        self.render_input_line(stdout)?;
-        Ok(())
+    pub fn print_log_entry(&mut self, log_line: &str) {
+        self.clear_input_line();
+        let _ = writeln!(self.stdout_handle, "{}", log_line);
+        let _ = self.stdout_handle.flush();
+        let _ = self.render_input_line();
     }
 
     /// Renders the input line with prompt and cursor positioning.
-    fn render_input_line(&mut self, stdout: &mut Stdout) -> Result<(), Box<dyn std::error::Error>> {
+    fn render_input_line(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let result = (|| -> Result<(), Box<dyn std::error::Error>> {
-            execute!(stdout, cursor::Hide)?;
-            self.clear_input_line(stdout)?;
+            execute!(self.stdout_handle, cursor::Hide)?;
+            self.clear_input_line();
             execute!(
-                stdout,
+                self.stdout_handle,
                 crossterm::style::Print("> "),
                 crossterm::style::Print(&self.current_input)
             )?;
@@ -579,15 +572,15 @@ impl TerminalApp {
                 .map(|c| c.width().unwrap_or(0))
                 .sum::<usize>();
             execute!(
-                stdout,
+                self.stdout_handle,
                 cursor::MoveToColumn(visual_cursor_pos as u16),
                 cursor::Show
             )?;
-            stdout.flush()?;
+            self.stdout_handle.flush()?;
             Ok(())
         })();
         if result.is_err() {
-            let _ = execute!(stdout, cursor::Show);
+            let _ = execute!(self.stdout_handle, cursor::Show);
         }
         result
     }
@@ -615,16 +608,25 @@ impl TerminalApp {
             self.last_ctrl_c = Some(Instant::now());
             return Ok((
                 false,
-                get_info!("Input cleared. Press Ctrl+C again to exit."),
+                get_info!(
+                    "Input cleared. Press Ctrl+C again to exit.",
+                    "Daemon Console"
+                ),
             ));
         }
         if let Some(last_time) = self.last_ctrl_c
             && last_time.elapsed().as_secs() < 5
         {
-            return Ok((true, get_warn!("Exiting application. Goodbye!")));
+            return Ok((
+                true,
+                get_warn!("Exiting application. Goodbye!", "Daemon Console"),
+            ));
         }
         self.last_ctrl_c = Some(Instant::now());
-        Ok((false, get_info!("Press Ctrl+C again to exit.")))
+        Ok((
+            false,
+            get_info!("Press Ctrl+C again to exit.", "Daemon Console"),
+        ))
     }
 
     /// Handles up the arrow key press for command history navigation.
@@ -671,30 +673,29 @@ impl TerminalApp {
     /// Returns an error if writing to stdout fails.
     pub async fn handle_enter_key(
         &mut self,
-        stdout: &mut Stdout,
         input_prefix: &str,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         if !self.current_input.trim().is_empty() {
             self.command_history.push(self.current_input.clone());
-            self.clear_input_line(stdout)?;
-            writeln!(stdout, "{}{}", input_prefix, self.current_input)?;
+            self.clear_input_line();
+            writeln!(self.stdout_handle, "{}{}", input_prefix, self.current_input)?;
             let input_copy = self.current_input.clone();
             let command_output = self.execute_command(&input_copy).await;
             if !command_output.is_empty() {
                 for line in command_output.lines() {
-                    execute!(stdout, cursor::MoveToColumn(0))?;
-                    writeln!(stdout, "{}", line.trim_start())?;
+                    execute!(self.stdout_handle, cursor::MoveToColumn(0))?;
+                    writeln!(self.stdout_handle, "{}", line.trim_start())?;
                 }
             } else {
-                writeln!(stdout)?;
+                writeln!(self.stdout_handle)?;
             }
             self.current_input.clear();
             self.cursor_position = 0;
             self.history_index = None;
-            self.render_input_line(stdout)?;
+            self.render_input_line()?;
         } else {
-            self.clear_input_line(stdout)?;
-            self.render_input_line(stdout)?;
+            self.clear_input_line();
+            self.render_input_line()?;
         }
         Ok(self.should_exit)
     }
@@ -732,7 +733,7 @@ impl TerminalApp {
                             .insert(cmd_name.to_string(), CommandHandlerType::Sync(sync_handler));
                         result
                     } else {
-                        get_error!("Internal error: sync handler not found")
+                        get_error!("Internal error: sync handler not found", "CommandStatus")
                     }
                 }
                 CommandHandlerType::Async(async_handler) => {
@@ -743,13 +744,16 @@ impl TerminalApp {
                         .await
                     {
                         Ok(_) => {
-                            get_info!(&format!(
-                                "Async command '{}' started in the background",
-                                cmd_name
-                            ))
+                            get_info!(
+                                &format!("Async command '{}' started in the background", cmd_name),
+                                "CommandStatus"
+                            )
                         }
                         Err(e) => {
-                            get_error!(&format!("Failed to spawn async command: {}", e))
+                            get_error!(
+                                &format!("Failed to spawn async command: {}", e),
+                                "CommandStatus"
+                            )
                         }
                     }
                 }
@@ -760,7 +764,10 @@ impl TerminalApp {
             } else if let Some(ref handler) = self.unknown_command_handler {
                 handler(command)
             } else {
-                get_warn!(&format!("Unknown command: '{}'", command))
+                get_warn!(
+                    &format!("Command not found or registered: '{}'", command),
+                    "CommandStatus"
+                )
             }
         }
     }
@@ -793,17 +800,33 @@ impl TerminalApp {
     /// ```
     /// use daemon_console::TerminalApp;
     ///
-    /// fn main() {
+    /// async fn main() {
     ///     let mut app = TerminalApp::new();
     ///     // let mut stdout_handle = stdout();
-    ///     app.info("Application started successfully!");
-    ///     app.info("Running tasks...");
+    ///     app.info("Application started successfully!").await;
+    ///     app.info("Running tasks...").await;
     ///     // app.shutdown_terminal(&mut stdout_handle, "ok");
     /// }
     /// ```
     pub fn info(&mut self, message: &str) {
-        let mut stdout_handle = stdout();
-        let _ = self.print_log_entry(&mut stdout_handle, &*get_info!(message));
+        let _ = self.print_log_entry(&get_info!(message, "Stream"));
+    }
+
+    /// Log debug-level messages.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use daemon_console::TerminalApp;
+    ///
+    /// fn main() {
+    ///     let mut app = TerminalApp::new();
+    ///     app.debug("Debugging information...");
+    ///     app.debug("Debugging more...");
+    /// }
+    /// ```
+    pub fn debug(&mut self, message: &str) {
+        let _ = self.print_log_entry(&get_debug!(message, "Stream"));
     }
 
     /// Log warn-level messages.
@@ -821,8 +844,7 @@ impl TerminalApp {
     /// }
     /// ```
     pub fn warn(&mut self, message: &str) {
-        let mut stdout_handle = stdout();
-        let _ = self.print_log_entry(&mut stdout_handle, &*get_warn!(message));
+        let _ = self.print_log_entry(&get_warn!(message, "Stream"));
     }
 
     /// Log error-level messages.
@@ -839,8 +861,7 @@ impl TerminalApp {
     /// }
     /// ```
     pub fn error(&mut self, message: &str) {
-        let mut stdout_handle = stdout();
-        let _ = self.print_log_entry(&mut stdout_handle, &*get_error!(message));
+        let _ = self.print_log_entry(&get_error!(message, "Stream"));
     }
 
     /// Log critical-level messages.
@@ -857,29 +878,24 @@ impl TerminalApp {
     /// }
     /// ```
     pub fn critical(&mut self, message: &str) {
-        let mut stdout_handle = stdout();
-        let _ = self.print_log_entry(&mut stdout_handle, &*get_critical!(message));
+        let _ = self.print_log_entry(&get_critical!(message, "Stream"));
     }
 
     /// Handles completed command results from async commands
     async fn handle_command_result(
         &mut self,
         result: CommandResult,
-        stdout: &mut Stdout,
     ) -> Result<(), Box<dyn std::error::Error>> {
         if !result.output.is_empty() {
             for line in result.output.lines() {
-                self.print_log_entry(stdout, line.trim_start()).await?;
+                self.print_log_entry(line.trim_start());
             }
         }
         Ok(())
     }
 
     /// Checks for completed running commands and cleans up finished tasks
-    async fn check_running_commands(
-        &mut self,
-        _stdout: &mut Stdout,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    async fn check_running_commands(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut completed_indices = Vec::new();
 
         for (i, cmd) in self.running_commands.iter().enumerate() {
@@ -909,13 +925,13 @@ impl TerminalApp {
         let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
         let tx = self.command_result_tx.as_ref().unwrap().clone();
         let cmd_copy = command.clone();
-        // 克隆action_sender以便传递给异步命令
+        // Clone action_sender to pass to the async command
         let action_sender = self.action_sender.clone();
 
         let handle = tokio::spawn(async move {
             // Create a temporary app instance for the async command
             let mut temp_app = TerminalApp::new();
-            // 设置action_sender到临时实例中
+            // Set the action sender for the temporary app
             if let Some(sender) = action_sender {
                 temp_app.set_action_sender(sender);
             }

@@ -48,14 +48,15 @@ struct SleepCommand;
 
 #[async_trait]
 impl AsyncCommandHandler for SleepCommand {
-    async fn execute_async(&mut self, _app: &mut TerminalApp, args: &[&str]) -> String {
+    async fn execute_async(&mut self, app: &mut TerminalApp, args: &[&str]) -> String {
         if args.is_empty() {
-            return get_error!("Usage: sleep <seconds>", "CommandHelp");
+            return get_error!("Usage: wait <seconds>", "CommandHelp");
         }
 
         match args[0].parse::<u64>() {
             Ok(seconds) => {
                 sleep(Duration::from_secs(seconds)).await;
+                app.info("Wake up!");
                 get_info!(
                     &format!("Finished sleeping for {} seconds!", seconds),
                     "CommandResp"
@@ -173,7 +174,7 @@ async fn register_commands(app: &mut TerminalApp) {
                 panic!("Application crashed intentionally!");
             }
 
-            app.info("This command does not crash the application.");
+            app.info("This command crashs the application.");
             app.warn("Dangerous option!");
             get_info!(
                 "Type this command again to crash the application.",
