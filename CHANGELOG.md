@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.2
+### Fix
+- (commit ) Improve logging multi-line messages 
+
 ## v0.3.1
 ### Fix
 - (commit 2883ba2, b86c60b) Improve example commands in src/main.rs and demo/main.rs
