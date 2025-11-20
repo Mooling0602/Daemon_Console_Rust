@@ -2,7 +2,7 @@
 
 ## v0.3.2
 ### Fix
-- (commit ) Improve logging multi-line messages 
+- (commit d294098) Improve logging multi-line messages 
 
 ## v0.3.1
 ### Fix
