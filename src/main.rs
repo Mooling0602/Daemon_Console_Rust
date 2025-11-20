@@ -39,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     let exit_message = "Daemon Console exiting. Goodbye!";
 
-    app.run(&startup_message, &exit_message).await
+    app.run(&startup_message, exit_message).await
 }
 
 /// Async command handler for the sleep command

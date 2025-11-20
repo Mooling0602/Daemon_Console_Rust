@@ -1,54 +1,60 @@
-use async_trait::async_trait;
-use daemon_console::{AppAction, AsyncCommandHandler, TerminalApp, get_info};
-use std::boxed::Box;
+use daemon_console::{AppAction, TerminalApp, events::DaemonConsoleEvent, get_info, get_warn};
 
 #[tokio::main]
 async fn main() {
     let mut app = TerminalApp::new();
-    register_commands(&mut app).await;
+
+    app.set_unknown_command_handler(|_| {
+        get_warn!("The command system disabled for developing the event system.")
+    });
+
+    // 获取 app 内部创建的 action sender 而不是自己创建
+    let action_tx = app
+        .get_action_sender()
+        .expect("Failed to get action sender");
+    let mut event_rx = app
+        .subscribe_events()
+        .expect("Failed to subscribe to events");
+
+    // 启动事件监听任务
+    tokio::spawn(async move {
+        while let Ok(event) = event_rx.recv().await {
+            match event {
+                DaemonConsoleEvent::CommandPromptInput { raw, timestamp } => {
+                    let _ = action_tx.send(AppAction::Info(format!(
+                        "[Event] CommandPromptInput: '{}' at {}",
+                        raw, timestamp
+                    )));
+                }
+
+                DaemonConsoleEvent::TerminalLog {
+                    level,
+                    message,
+                    module_name,
+                    timestamp,
+                } => {
+                    let _ = action_tx.send(AppAction::Debug(format!(
+                        "[Event] TerminalLog: [{:?}] {} (module: {:?}, ts: {})",
+                        level, message, module_name, timestamp
+                    )));
+                }
+
+                DaemonConsoleEvent::SubprocessLog {
+                    pid,
+                    message,
+                    timestamp,
+                } => {
+                    let _ = action_tx.send(AppAction::Warn(format!(
+                        "[Event] SubprocessLog: [PID:{}] {} at {}",
+                        pid, message, timestamp
+                    )));
+                }
+            }
+        }
+    });
+
+    // 直接调用 run，让它管理自己的 action channel
     let _ = app
         .run(&get_info!("App demo starting...", "Demo"), "")
         .await;
-}
-
-async fn register_commands(app: &mut TerminalApp) {
-    app.register_async_command("register", Box::new(RegisterCommand {}));
-}
-
-/// 异步命令处理器用于注册新命令
-#[derive(Clone)]
-struct RegisterCommand;
-
-#[async_trait]
-impl AsyncCommandHandler for RegisterCommand {
-    async fn execute_async(&mut self, app: &mut TerminalApp, args: &[&str]) -> String {
-        if args.len() < 2 {
-            return get_info!("Usage: register <command> <reply>", "CommandHelp");
-        }
-
-        let cmd = args[0];
-        let reply = args[1..].join(" ");
-
-        // 创建一个新的命令处理器
-        let handler =
-            Box::new(move |_app: &mut TerminalApp, _args: &[&str]| -> String { get_info!(&reply) });
-
-        // 通过action_sender发送注册命令的请求
-        if let Some(sender) = &app.action_sender {
-            let _ = sender.send(AppAction::RegisterCommand(cmd.to_string(), handler));
-            get_info!(
-                &format!("Command '{}' registered successfully!", cmd),
-                "CommandResp"
-            )
-        } else {
-            get_info!(
-                "Failed to register command: no action sender available",
-                "CommandResp"
-            )
-        }
-    }
-
-    fn box_clone(&self) -> Box<dyn AsyncCommandHandler> {
-        Box::new(self.clone())
-    }
 }
