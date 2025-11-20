@@ -118,7 +118,7 @@ async fn register_commands(app: &mut TerminalApp) {
     app.register_command(
         "help",
         Box::new(|_: &mut TerminalApp, _: &[&str]| -> String {
-            get_info!("Available commands:\n  Sync: 'list', 'help', 'exit', 'debug', 'hello', 'test', 'crash'\n  Async (non-blocking): 'wait <seconds>'\nAsync commands run in the background - you can continue typing while they execute!", "CommandHelp")
+            get_info!("Available commands:\n- Sync: 'list', 'help', 'exit', 'debug', 'hello', 'test', 'crash'\n- Async (non-blocking): 'wait <seconds>'\nAsync commands run in the background - you can continue typing while they execute!", "CommandHelp")
         }),
     );
 

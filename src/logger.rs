@@ -83,6 +83,25 @@ pub fn log_message(level: LogLevel, message: &str, module_name: Option<&str>) ->
     }
 }
 
+/// Format multi-line messages with log-levels.
+///
+/// > Middleware method for macros like `get_info!`.
+pub fn format_multiline_message(
+    level: LogLevel,
+    message: &str,
+    module_name: Option<&str>,
+) -> String {
+    if !message.contains('\n') {
+        return log_message(level, message, module_name);
+    }
+
+    message
+        .lines()
+        .map(|line| log_message(level, line, module_name))
+        .collect::<Vec<String>>()
+        .join("\n")
+}
+
 /// Macro for creating info-level log messages.
 ///
 /// # Examples
@@ -96,10 +115,14 @@ pub fn log_message(level: LogLevel, message: &str, module_name: Option<&str>) ->
 #[macro_export]
 macro_rules! get_info {
     ($message:expr) => {
-        $crate::logger::log_message($crate::logger::LogLevel::Info, $message, None)
+        $crate::logger::format_multiline_message($crate::logger::LogLevel::Info, $message, None)
     };
     ($message:expr, $module_name:expr) => {
-        $crate::logger::log_message($crate::logger::LogLevel::Info, $message, Some($module_name))
+        $crate::logger::format_multiline_message(
+            $crate::logger::LogLevel::Info,
+            $message,
+            Some($module_name),
+        )
     };
 }
 
@@ -116,10 +139,14 @@ macro_rules! get_info {
 #[macro_export]
 macro_rules! get_warn {
     ($message:expr) => {
-        $crate::logger::log_message($crate::logger::LogLevel::Warn, $message, None)
+        $crate::logger::format_multiline_message($crate::logger::LogLevel::Warn, $message, None)
     };
     ($message:expr, $module_name:expr) => {
-        $crate::logger::log_message($crate::logger::LogLevel::Warn, $message, Some($module_name))
+        $crate::logger::format_multiline_message(
+            $crate::logger::LogLevel::Warn,
+            $message,
+            Some($module_name),
+        )
     };
 }
 
@@ -136,10 +163,10 @@ macro_rules! get_warn {
 #[macro_export]
 macro_rules! get_error {
     ($message:expr) => {
-        $crate::logger::log_message($crate::logger::LogLevel::Error, $message, None)
+        $crate::logger::format_multiline_message($crate::logger::LogLevel::Error, $message, None)
     };
     ($message:expr, $module_name:expr) => {
-        $crate::logger::log_message(
+        $crate::logger::format_multiline_message(
             $crate::logger::LogLevel::Error,
             $message,
             Some($module_name),
@@ -160,10 +187,10 @@ macro_rules! get_error {
 #[macro_export]
 macro_rules! get_debug {
     ($message:expr) => {
-        $crate::logger::log_message($crate::logger::LogLevel::Debug, $message, None)
+        $crate::logger::format_multiline_message($crate::logger::LogLevel::Debug, $message, None)
     };
     ($message:expr, $module_name:expr) => {
-        $crate::logger::log_message(
+        $crate::logger::format_multiline_message(
             $crate::logger::LogLevel::Debug,
             $message,
             Some($module_name),
@@ -184,10 +211,10 @@ macro_rules! get_debug {
 #[macro_export]
 macro_rules! get_critical {
     ($message:expr) => {
-        $crate::logger::log_message($crate::logger::LogLevel::Critical, $message, None)
+        $crate::logger::format_multiline_message($crate::logger::LogLevel::Critical, $message, None)
     };
     ($message:expr, $module_name:expr) => {
-        $crate::logger::log_message(
+        $crate::logger::format_multiline_message(
             $crate::logger::LogLevel::Critical,
             $message,
             Some($module_name),
