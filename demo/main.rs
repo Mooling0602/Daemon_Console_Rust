@@ -1,4 +1,7 @@
-use daemon_console::{AppAction, TerminalApp, events::DaemonConsoleEvent, get_info, get_warn};
+use daemon_console::{
+    AppAction, TerminalApp, events::DaemonConsoleEvent, get_info, get_warn,
+    utils::get_local_timestring,
+};
 
 #[tokio::main]
 async fn main() {
@@ -23,7 +26,8 @@ async fn main() {
                 DaemonConsoleEvent::CommandPromptInput { raw, timestamp } => {
                     let _ = action_tx.send(AppAction::Info(format!(
                         "[Event] CommandPromptInput: '{}' at {}",
-                        raw, timestamp
+                        raw,
+                        get_local_timestring(timestamp)
                     )));
                 }
 

@@ -25,6 +25,7 @@
 pub mod command;
 pub mod events;
 pub mod logger;
+pub mod utils;
 
 use crossterm::{
     cursor,
