@@ -63,6 +63,8 @@ pub enum AppAction {
     Error(String),
     /// Log a critical message
     Critical(String),
+    /// Unified logger to log any message
+    Logger(LogLevel, String, Option<String>, Option<bool>),
 }
 
 impl std::fmt::Debug for AppAction {
@@ -78,6 +80,13 @@ impl std::fmt::Debug for AppAction {
             AppAction::Warn(msg) => f.debug_tuple("Warn").field(msg).finish(),
             AppAction::Error(msg) => f.debug_tuple("Error").field(msg).finish(),
             AppAction::Critical(msg) => f.debug_tuple("Critical").field(msg).finish(),
+            AppAction::Logger(level, msg, _, _) => f
+                .debug_struct("Logger")
+                .field("level", level)
+                .field("msg", msg)
+                .field("module", &"Option<String>")
+                .field("dp_evt", &"Option<bool>")
+                .finish(),
         }
     }
 }
@@ -452,6 +461,9 @@ impl TerminalApp {
                     | AppAction::Critical(_) => {
                         self.handle_log_action(action);
                     }
+                    AppAction::Logger(level, message, module_name, dispatch_event) => {
+                        self.handle_logger_action(level, message, module_name, dispatch_event);
+                    }
                 }
             }
 
@@ -700,6 +712,20 @@ impl TerminalApp {
         self.switch_if_dispatch_event();
     }
 
+    /// Handles logger actions with event dispatch toggling
+    fn handle_logger_action(
+        &mut self,
+        level: LogLevel,
+        message: String,
+        module_name: Option<String>,
+        dispatch_event: Option<bool>,
+    ) {
+        self.switch_if_dispatch_event();
+        let module_str = module_name.as_deref();
+        self.logger(level, &message, module_str, dispatch_event);
+        self.switch_if_dispatch_event();
+    }
+
     /// Log info-level messages.
     ///
     /// This method ensures proper terminal line management by clearing the current
@@ -721,8 +747,7 @@ impl TerminalApp {
     /// }
     /// ```
     pub fn info(&mut self, message: &str) {
-        self.print_log_entry(&get_info!(message, "Stream"));
-        self.dispatch_log_events(message, LogLevel::Info);
+        self.logger(LogLevel::Info, message, Some("Stream"), None);
     }
 
     /// Log debug-level messages.
@@ -739,8 +764,7 @@ impl TerminalApp {
     /// }
     /// ```
     pub fn debug(&mut self, message: &str) {
-        self.print_log_entry(&get_debug!(message, "Stream"));
-        self.dispatch_log_events(message, LogLevel::Debug);
+        self.logger(LogLevel::Debug, message, Some("Stream"), None);
     }
 
     /// Log warn-level messages.
@@ -757,8 +781,7 @@ impl TerminalApp {
     /// }
     /// ```
     pub fn warn(&mut self, message: &str) {
-        self.print_log_entry(&get_warn!(message, "Stream"));
-        self.dispatch_log_events(message, LogLevel::Warn);
+        self.logger(LogLevel::Warn, message, Some("Stream"), None);
     }
 
     /// Log error-level messages.
@@ -775,8 +798,7 @@ impl TerminalApp {
     /// }
     /// ```
     pub fn error(&mut self, message: &str) {
-        self.print_log_entry(&get_error!(message, "Stream"));
-        self.dispatch_log_events(message, LogLevel::Error);
+        self.logger(LogLevel::Error, message, Some("Stream"), None);
     }
 
     /// Log critical-level messages.
@@ -793,8 +815,7 @@ impl TerminalApp {
     /// }
     /// ```
     pub fn critical(&mut self, message: &str) {
-        self.print_log_entry(&get_critical!(message, "Stream"));
-        self.dispatch_log_events(message, LogLevel::Critical);
+        self.logger(LogLevel::Critical, message, Some("Stream"), None);
     }
 
     /// Unified logger method that allows specifying a custom module name for the log message.
@@ -862,7 +883,7 @@ impl TerminalApp {
             }
         };
         self.print_log_entry(&formatted_message);
-        let should_dispatch = dp_evt.unwrap_or(false);
+        let should_dispatch = dp_evt.unwrap_or(true);
         if should_dispatch {
             self.dispatch_log_events(message, level);
         };
