@@ -797,6 +797,77 @@ impl TerminalApp {
         self.dispatch_log_events(message, LogLevel::Critical);
     }
 
+    /// Unified logger method that allows specifying a custom module name for the log message.
+    ///
+    /// # Arguments
+    ///
+    /// * `level` - The log level (Info, Warn, Error, Debug, Critical)
+    /// * `message` - The message content to be logged
+    /// * `module_name` - The name of the module to associate with the log message (optional)
+    /// * `dispatch_event` - Whether to dispatch log events (optional, defaults to true)
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use daemon_console::{TerminalApp, logger::LogLevel};
+    ///
+    /// fn example() {
+    ///     let mut app = TerminalApp::new();
+    ///     app.logger(LogLevel::Info, "Application started", Some("Main"), None);
+    ///     app.logger(LogLevel::Error, "Database connection failed", None, Some(true));
+    /// }
+    /// ```
+    pub fn logger(
+        &mut self,
+        level: LogLevel,
+        message: &str,
+        module_name: Option<&str>,
+        dp_evt: Option<bool>,
+    ) {
+        let formatted_message = match level {
+            LogLevel::Info => {
+                if let Some(module) = module_name {
+                    get_info!(message, module)
+                } else {
+                    get_info!(message)
+                }
+            }
+            LogLevel::Warn => {
+                if let Some(module) = module_name {
+                    get_warn!(message, module)
+                } else {
+                    get_warn!(message)
+                }
+            }
+            LogLevel::Error => {
+                if let Some(module) = module_name {
+                    get_error!(message, module)
+                } else {
+                    get_error!(message)
+                }
+            }
+            LogLevel::Debug => {
+                if let Some(module) = module_name {
+                    get_debug!(message, module)
+                } else {
+                    get_debug!(message)
+                }
+            }
+            LogLevel::Critical => {
+                if let Some(module) = module_name {
+                    get_critical!(message, module)
+                } else {
+                    get_critical!(message)
+                }
+            }
+        };
+        self.print_log_entry(&formatted_message);
+        let should_dispatch = dp_evt.unwrap_or(false);
+        if should_dispatch {
+            self.dispatch_log_events(message, level);
+        };
+    }
+
     /// Handles completed command results from async commands
     async fn handle_command_result(
         &mut self,
