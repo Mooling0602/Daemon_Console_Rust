@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.3
+### Refactor
+- Lots of code refactor, see https://github.com/Mooling0602/Daemon_Console_Rust/compare/v0.3.2...v0.3.3
+
 ## v0.3.2
 ### Fix
 - (commit d294098) Improve logging multi-line messages 
