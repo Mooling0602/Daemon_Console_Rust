@@ -3,9 +3,9 @@ use chrono::Local;
 
 #[derive(Debug, Clone)]
 pub enum DaemonConsoleEvent {
-    CommandPromptInput {
+    UserConsoleInput {
         raw: String,    // raw input
-        timestamp: i64, // time
+        timestamp: i64, // raw time
     },
     TerminalLog {
         level: LogLevel,

@@ -154,29 +154,35 @@ impl TerminalApp {
         }
     }
 
+    /// Gets a clone of the action sender for communication with async commands
     pub fn get_action_sender(&self) -> Option<mpsc::UnboundedSender<AppAction>> {
         self.action_sender.clone()
     }
 
+    /// Toggles the event dispatch flag
     fn switch_if_dispatch_event(&mut self) {
         self.dispatch_event = !self.dispatch_event;
     }
 
+    /// Subscribes to daemon console events
     pub fn subscribe_events(&self) -> Option<broadcast::Receiver<events::DaemonConsoleEvent>> {
         self.events_tx.as_ref().map(|tx| tx.subscribe())
     }
 
+    /// Emits an event to the event channel
     fn emit_events(&self, _event: events::DaemonConsoleEvent) {
         if let Some(tx) = &self.events_tx {
             let _ = tx.send(_event);
         }
     }
 
+    /// Registers a synchronous command with the terminal application
     pub fn register_command<S: Into<String>>(&mut self, name: S, handler: Box<dyn CommandHandler>) {
         self.commands
             .insert(name.into(), CommandHandlerType::PubSync(handler));
     }
 
+    /// Registers an asynchronous command with the terminal application
     pub fn register_async_command<S: Into<String>>(
         &mut self,
         name: S,
@@ -247,7 +253,7 @@ impl TerminalApp {
         Ok(())
     }
 
-    /// 设置终端模式和鼠标捕获
+    /// Sets up the terminal in raw mode and enables mouse capture
     fn setup_terminal(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         enable_raw_mode()?;
         execute!(&mut self.stdout_handle, EnableMouseCapture, cursor::Hide)?;
@@ -255,6 +261,7 @@ impl TerminalApp {
         Ok(())
     }
 
+    /// Prints the startup message to the terminal
     async fn print_startup_message(
         &mut self,
         message: &str,
@@ -422,8 +429,6 @@ impl TerminalApp {
         startup_message: &str,
         exit_message: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        // Create a channel for AppAction messages
-        // let (mut _action_tx, mut action_rx) = mpsc::unbounded_channel::<AppAction>();
         let mut action_rx = self.action_receiver.take().unwrap();
 
         enable_raw_mode()?;
@@ -440,30 +445,12 @@ impl TerminalApp {
                     AppAction::RegisterCommand(name, handler) => {
                         self.register_command(name, handler);
                     }
-                    AppAction::Info(msg) => {
-                        self.switch_if_dispatch_event();
-                        self.info(&msg);
-                        self.switch_if_dispatch_event();
-                    }
-                    AppAction::Debug(msg) => {
-                        self.switch_if_dispatch_event();
-                        self.debug(&msg);
-                        self.switch_if_dispatch_event();
-                    }
-                    AppAction::Warn(msg) => {
-                        self.switch_if_dispatch_event();
-                        self.warn(&msg);
-                        self.switch_if_dispatch_event();
-                    }
-                    AppAction::Error(msg) => {
-                        self.switch_if_dispatch_event();
-                        self.error(&msg);
-                        self.switch_if_dispatch_event();
-                    }
-                    AppAction::Critical(msg) => {
-                        self.switch_if_dispatch_event();
-                        self.critical(&msg);
-                        self.switch_if_dispatch_event();
+                    AppAction::Info(_)
+                    | AppAction::Debug(_)
+                    | AppAction::Warn(_)
+                    | AppAction::Error(_)
+                    | AppAction::Critical(_) => {
+                        self.handle_log_action(action);
                     }
                 }
             }
@@ -639,6 +626,7 @@ impl TerminalApp {
         self.cursor_position = self.current_input.chars().count();
     }
 
+    /// Handles the enter key press event, executing commands and managing input history
     pub async fn handle_enter_key(
         &mut self,
         input_prefix: &str,
@@ -648,7 +636,7 @@ impl TerminalApp {
             self.clear_input_line();
             writeln!(self.stdout_handle, "{}{}", input_prefix, self.current_input)?;
             let input_copy = self.current_input.clone();
-            self.emit_events(events::DaemonConsoleEvent::CommandPromptInput {
+            self.emit_events(events::DaemonConsoleEvent::UserConsoleInput {
                 raw: input_copy.clone(),
                 timestamp: events::DaemonConsoleEvent::now_ts(),
             });
@@ -686,7 +674,7 @@ impl TerminalApp {
         self.cursor_position += 1;
     }
 
-    /// Dispatch log events.
+    /// Dispatches log events if event dispatching is enabled
     fn dispatch_log_events(&mut self, message: &str, level: LogLevel) {
         if self.dispatch_event {
             self.emit_events(events::DaemonConsoleEvent::TerminalLog {
@@ -696,6 +684,20 @@ impl TerminalApp {
                 timestamp: events::DaemonConsoleEvent::now_ts(),
             });
         }
+    }
+
+    /// Handles log actions with event dispatch toggling
+    fn handle_log_action(&mut self, action: AppAction) {
+        self.switch_if_dispatch_event();
+        match action {
+            AppAction::Info(msg) => self.info(&msg),
+            AppAction::Debug(msg) => self.debug(&msg),
+            AppAction::Warn(msg) => self.warn(&msg),
+            AppAction::Error(msg) => self.error(&msg),
+            AppAction::Critical(msg) => self.critical(&msg),
+            _ => {} // Should not reach here
+        }
+        self.switch_if_dispatch_event();
     }
 
     /// Log info-level messages.
