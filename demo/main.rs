@@ -24,6 +24,17 @@ async fn main() {
         while let Ok(event) = event_rx.recv().await {
             match event {
                 DaemonConsoleEvent::CommandPromptInput { raw, timestamp } => {
+                    // 对特定命令进行响应
+                    if raw.trim() == "test" {
+                        let _ = action_tx.send(AppAction::Info("ok".to_string()));
+                    } else if raw.trim() == "hello" {
+                        let _ = action_tx.send(AppAction::Info("Hello there!".to_string()));
+                    } else if raw.trim().starts_with("echo ") {
+                        let echo_content = raw.trim().strip_prefix("echo ").unwrap_or("");
+                        let _ = action_tx.send(AppAction::Info(format!("Echo: {}", echo_content)));
+                    }
+                    
+                    // 原有的日志记录
                     let _ = action_tx.send(AppAction::Info(format!(
                         "[Event] CommandPromptInput: '{}' at {}",
                         raw,
