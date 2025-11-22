@@ -68,13 +68,12 @@ pub fn log_message(level: LogLevel, message: &str, module_name: Option<&str>) ->
         }
         LogLevel::Debug => {
             format!(
-                "{}{}[{}] [{}{}]{} {}{}{}",
+                "{}{}[{}] [{}{}] {}{}{}",
                 SetForegroundColor(color),
                 style::Attribute::Italic,
                 timestamp,
                 module_prefix,
                 level_str,
-                ResetColor,
                 style::Attribute::Italic,
                 message,
                 ResetColor,

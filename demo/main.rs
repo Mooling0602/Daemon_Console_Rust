@@ -3,13 +3,11 @@ use daemon_console::{
     utils::get_local_timestring,
 };
 
-/// 处理用户控制台输入事件
 fn handle_user_input_event(
     raw: &str,
     timestamp: i64,
     action_tx: &tokio::sync::mpsc::UnboundedSender<AppAction>,
 ) {
-    // 对特定命令进行响应
     if raw.trim() == "test" {
         let _ = action_tx.send(AppAction::Info("ok".to_string()));
     } else if raw.trim() == "hello" {
@@ -19,15 +17,13 @@ fn handle_user_input_event(
         let _ = action_tx.send(AppAction::Info(format!("Echo: {}", echo_content)));
     }
 
-    // 原有的日志记录
     let _ = action_tx.send(AppAction::Info(format!(
-        "[Event] CommandPromptInput: '{}' at {}",
+        "event 'CommandPromptInput': raw='{}', local_time={}",
         raw,
         get_local_timestring(timestamp)
     )));
 }
 
-/// 处理终端日志事件
 fn handle_terminal_log_event(
     level: LogLevel,
     message: &str,
@@ -36,12 +32,11 @@ fn handle_terminal_log_event(
     action_tx: &tokio::sync::mpsc::UnboundedSender<AppAction>,
 ) {
     let _ = action_tx.send(AppAction::Debug(format!(
-        "[Event] TerminalLog: [{:?}] {} (module: {:?}, ts: {})",
+        "event 'TerminalLog': level={:?}, message='{}', module_name='{:?}', timestamp={}",
         level, message, module_name, timestamp
     )));
 }
 
-/// 处理子进程日志事件
 fn handle_subprocess_log_event(
     pid: u32,
     message: &str,
@@ -49,12 +44,11 @@ fn handle_subprocess_log_event(
     action_tx: &tokio::sync::mpsc::UnboundedSender<AppAction>,
 ) {
     let _ = action_tx.send(AppAction::Warn(format!(
-        "[Event] SubprocessLog: [PID:{}] {} at {}",
+        "event 'SubprocessLog': pid={}, message='{}', timestamp={}",
         pid, message, timestamp
     )));
 }
 
-/// 启动事件监听任务
 fn start_event_listener(
     mut event_rx: tokio::sync::broadcast::Receiver<DaemonConsoleEvent>,
     action_tx: tokio::sync::mpsc::UnboundedSender<AppAction>,
@@ -100,10 +94,10 @@ async fn main() {
         .subscribe_events()
         .expect("Failed to subscribe to events");
 
-    // 启动事件监听任务
     start_event_listener(event_rx, action_tx);
 
-    // 直接调用 run，让它管理自己的 action channel
+    app.info("This message used for debugging 'TerminalLog' event.");
+
     let _ = app
         .run(&get_info!("App demo starting...", "Demo"), "")
         .await;
