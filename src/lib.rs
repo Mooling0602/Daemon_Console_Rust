@@ -118,6 +118,7 @@ pub struct TerminalApp {
     pub action_sender: Option<mpsc::UnboundedSender<AppAction>>,
     pub action_receiver: Option<mpsc::UnboundedReceiver<AppAction>>,
     pub events_tx: Option<broadcast::Sender<events::DaemonConsoleEvent>>,
+    is_shadow: bool,
 }
 
 impl Default for TerminalApp {
@@ -160,6 +161,7 @@ impl TerminalApp {
             action_receiver: Some(action_rx),
             events_tx: Some(events_tx),
             dispatch_event: true,
+            is_shadow: false,
         }
     }
 
@@ -445,61 +447,61 @@ impl TerminalApp {
             self.print_log_entry(startup_message);
         }
 
-        loop {
-            // Handle AppAction messages
-            while let Ok(action) = action_rx.try_recv() {
-                match action {
-                    AppAction::RegisterCommand(name, handler) => {
-                        self.register_command(name, handler);
-                    }
-                    AppAction::Info(_)
-                    | AppAction::Debug(_)
-                    | AppAction::Warn(_)
-                    | AppAction::Error(_)
-                    | AppAction::Critical(_) => {
-                        self.handle_log_action(action);
-                    }
-                    AppAction::Logger(level, message, module_name, dispatch_event) => {
-                        self.handle_logger_action(level, message, module_name, dispatch_event);
+        let loop_result: Result<(), Box<dyn std::error::Error>> = async {
+            loop {
+                while let Ok(action) = action_rx.try_recv() {
+                    match action {
+                        AppAction::RegisterCommand(name, handler) => {
+                            self.register_command(name, handler);
+                        }
+                        AppAction::Info(_)
+                        | AppAction::Debug(_)
+                        | AppAction::Warn(_)
+                        | AppAction::Error(_)
+                        | AppAction::Critical(_) => {
+                            self.handle_log_action(action);
+                        }
+                        AppAction::Logger(level, message, module_name, dispatch_event) => {
+                            self.handle_logger_action(level, message, module_name, dispatch_event);
+                        }
                     }
                 }
-            }
 
-            // Check for completed async commands
-            self.check_running_commands().await?;
+                self.check_running_commands().await?;
 
-            // Process command results
-            if let Some(ref mut rx) = self.command_result_rx
-                && let Ok(result) = rx.try_recv()
-            {
-                self.handle_command_result(result).await?;
-            }
+                if let Some(ref mut rx) = self.command_result_rx
+                    && let Ok(result) = rx.try_recv()
+                {
+                    self.handle_command_result(result).await?;
+                }
 
-            // Handle terminal events (non-blocking)
-            tokio::select! {
-                _ = tokio::time::sleep(tokio::time::Duration::from_millis(50)) => {
-                    // Check if events are available without blocking
-                    if poll(std::time::Duration::from_millis(0))?
-                        && let Ok(event) = event::read()
-                            && self.process_event(event).await? {
-                                break;
-                            }
+                tokio::select! {
+                    _ = tokio::time::sleep(tokio::time::Duration::from_millis(50)) => {
+                        if poll(std::time::Duration::from_millis(0))?
+                            && let Ok(event) = event::read()
+                                && self.process_event(event).await? {
+                                    break;
+                                }
+                    }
+                }
+
+                if self.should_exit {
+                    break;
                 }
             }
-
-            if self.should_exit {
-                break;
-            }
+            #[allow(unreachable_code)]
+            Ok(())
         }
+        .await;
 
-        disable_raw_mode()?;
-        execute!(self.stdout_handle, DisableMouseCapture, cursor::Show)?;
+        let _ = disable_raw_mode();
+        let _ = execute!(self.stdout_handle, DisableMouseCapture, cursor::Show);
 
         if !exit_message.is_empty() {
             println!("{}", exit_message);
         }
 
-        Ok(())
+        loop_result
     }
 
     /// Clear the current input line and re-renders it.
@@ -843,6 +845,18 @@ impl TerminalApp {
         module_name: Option<&str>,
         dp_evt: Option<bool>,
     ) {
+        if self.is_shadow {
+            if let Some(ref sender) = self.action_sender {
+                let _ = sender.send(AppAction::Logger(
+                    level,
+                    message.to_string(),
+                    module_name.map(|s| s.to_string()),
+                    dp_evt,
+                ));
+            }
+            return;
+        }
+
         let formatted_message = match level {
             LogLevel::Info => {
                 if let Some(module) = module_name {
@@ -932,9 +946,8 @@ impl TerminalApp {
         let action_sender = self.action_sender.clone();
 
         let handle = tokio::spawn(async move {
-            // Create a temporary app instance for the async command
             let mut temp_app = TerminalApp::new();
-            // Set the action sender for the temporary app
+            temp_app.is_shadow = true;
             if let Some(sender) = action_sender {
                 temp_app.set_action_sender(sender);
             }
