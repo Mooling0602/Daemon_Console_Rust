@@ -440,14 +440,14 @@ impl TerminalApp {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut action_rx = self.action_receiver.take().unwrap();
 
-        enable_raw_mode()?;
-        execute!(self.stdout_handle, EnableMouseCapture, cursor::Hide)?;
-
-        if !startup_message.is_empty() {
-            self.print_log_entry(startup_message);
-        }
-
         let loop_result: Result<(), Box<dyn std::error::Error>> = async {
+            enable_raw_mode()?;
+            execute!(self.stdout_handle, EnableMouseCapture, cursor::Hide)?;
+
+            if !startup_message.is_empty() {
+                self.print_log_entry(startup_message);
+            }
+
             loop {
                 while let Ok(action) = action_rx.try_recv() {
                     match action {
@@ -494,14 +494,17 @@ impl TerminalApp {
         }
         .await;
 
-        let _ = disable_raw_mode();
-        let _ = execute!(self.stdout_handle, DisableMouseCapture, cursor::Show);
+        let cleanup_result: Result<(), Box<dyn std::error::Error>> = (|| {
+            disable_raw_mode()?;
+            execute!(self.stdout_handle, DisableMouseCapture, cursor::Show)?;
+            Ok(())
+        })();
 
         if !exit_message.is_empty() {
             println!("{}", exit_message);
         }
 
-        loop_result
+        loop_result.and(cleanup_result)
     }
 
     /// Clear the current input line and re-renders it.
