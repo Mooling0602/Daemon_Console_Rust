@@ -118,6 +118,7 @@ pub struct TerminalApp {
     pub action_sender: Option<mpsc::UnboundedSender<AppAction>>,
     pub action_receiver: Option<mpsc::UnboundedReceiver<AppAction>>,
     pub events_tx: Option<broadcast::Sender<events::DaemonConsoleEvent>>,
+    is_shadow: bool,
 }
 
 impl Default for TerminalApp {
@@ -160,6 +161,7 @@ impl TerminalApp {
             action_receiver: Some(action_rx),
             events_tx: Some(events_tx),
             dispatch_event: true,
+            is_shadow: false,
         }
     }
 
@@ -386,12 +388,10 @@ impl TerminalApp {
                     self.handle_char_input(c);
                     self.render_input_line()?;
                 }
-                KeyCode::Backspace => {
-                    if self.cursor_position > 0 {
-                        self.remove_char_at(self.cursor_position - 1);
-                        self.cursor_position -= 1;
-                        self.render_input_line()?;
-                    }
+                KeyCode::Backspace if self.cursor_position > 0 => {
+                    self.remove_char_at(self.cursor_position - 1);
+                    self.cursor_position -= 1;
+                    self.render_input_line()?;
                 }
                 _ => {}
             }
@@ -440,68 +440,71 @@ impl TerminalApp {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut action_rx = self.action_receiver.take().unwrap();
 
-        enable_raw_mode()?;
-        execute!(self.stdout_handle, EnableMouseCapture, cursor::Hide)?;
+        let loop_result: Result<(), Box<dyn std::error::Error>> = async {
+            enable_raw_mode()?;
+            execute!(self.stdout_handle, EnableMouseCapture, cursor::Hide)?;
 
-        if !startup_message.is_empty() {
-            self.print_log_entry(startup_message);
-        }
+            if !startup_message.is_empty() {
+                self.print_log_entry(startup_message);
+            }
 
-        loop {
-            // Handle AppAction messages
-            while let Ok(action) = action_rx.try_recv() {
-                match action {
-                    AppAction::RegisterCommand(name, handler) => {
-                        self.register_command(name, handler);
-                    }
-                    AppAction::Info(_)
-                    | AppAction::Debug(_)
-                    | AppAction::Warn(_)
-                    | AppAction::Error(_)
-                    | AppAction::Critical(_) => {
-                        self.handle_log_action(action);
-                    }
-                    AppAction::Logger(level, message, module_name, dispatch_event) => {
-                        self.handle_logger_action(level, message, module_name, dispatch_event);
+            loop {
+                while let Ok(action) = action_rx.try_recv() {
+                    match action {
+                        AppAction::RegisterCommand(name, handler) => {
+                            self.register_command(name, handler);
+                        }
+                        AppAction::Info(_)
+                        | AppAction::Debug(_)
+                        | AppAction::Warn(_)
+                        | AppAction::Error(_)
+                        | AppAction::Critical(_) => {
+                            self.handle_log_action(action);
+                        }
+                        AppAction::Logger(level, message, module_name, dispatch_event) => {
+                            self.handle_logger_action(level, message, module_name, dispatch_event);
+                        }
                     }
                 }
-            }
 
-            // Check for completed async commands
-            self.check_running_commands().await?;
+                self.check_running_commands().await?;
 
-            // Process command results
-            if let Some(ref mut rx) = self.command_result_rx
-                && let Ok(result) = rx.try_recv()
-            {
-                self.handle_command_result(result).await?;
-            }
+                if let Some(ref mut rx) = self.command_result_rx
+                    && let Ok(result) = rx.try_recv()
+                {
+                    self.handle_command_result(result).await?;
+                }
 
-            // Handle terminal events (non-blocking)
-            tokio::select! {
-                _ = tokio::time::sleep(tokio::time::Duration::from_millis(50)) => {
-                    // Check if events are available without blocking
-                    if poll(std::time::Duration::from_millis(0))?
-                        && let Ok(event) = event::read()
-                            && self.process_event(event).await? {
-                                break;
-                            }
+                tokio::select! {
+                    _ = tokio::time::sleep(tokio::time::Duration::from_millis(50)) => {
+                        if poll(std::time::Duration::from_millis(0))?
+                            && let Ok(event) = event::read()
+                                && self.process_event(event).await? {
+                                    break;
+                                }
+                    }
+                }
+
+                if self.should_exit {
+                    break;
                 }
             }
-
-            if self.should_exit {
-                break;
-            }
+            #[allow(unreachable_code)]
+            Ok(())
         }
+        .await;
 
-        disable_raw_mode()?;
-        execute!(self.stdout_handle, DisableMouseCapture, cursor::Show)?;
+        let cleanup_result: Result<(), Box<dyn std::error::Error>> = (|| {
+            disable_raw_mode()?;
+            execute!(self.stdout_handle, DisableMouseCapture, cursor::Show)?;
+            Ok(())
+        })();
 
         if !exit_message.is_empty() {
             println!("{}", exit_message);
         }
 
-        Ok(())
+        loop_result.and(cleanup_result)
     }
 
     /// Clear the current input line and re-renders it.
@@ -845,6 +848,18 @@ impl TerminalApp {
         module_name: Option<&str>,
         dp_evt: Option<bool>,
     ) {
+        if self.is_shadow {
+            if let Some(ref sender) = self.action_sender {
+                let _ = sender.send(AppAction::Logger(
+                    level,
+                    message.to_string(),
+                    module_name.map(|s| s.to_string()),
+                    dp_evt,
+                ));
+            }
+            return;
+        }
+
         let formatted_message = match level {
             LogLevel::Info => {
                 if let Some(module) = module_name {
@@ -908,8 +923,6 @@ impl TerminalApp {
 
         for (i, cmd) in self.running_commands.iter().enumerate() {
             if cmd.handle.is_finished() {
-                // Log completion (using the command field)
-                let _ = &cmd.command;
                 completed_indices.push(i);
             }
         }
@@ -936,9 +949,8 @@ impl TerminalApp {
         let action_sender = self.action_sender.clone();
 
         let handle = tokio::spawn(async move {
-            // Create a temporary app instance for the async command
             let mut temp_app = TerminalApp::new();
-            // Set the action sender for the temporary app
+            temp_app.is_shadow = true;
             if let Some(sender) = action_sender {
                 temp_app.set_action_sender(sender);
             }
@@ -957,5 +969,162 @@ impl TerminalApp {
             .push(RunningCommand { command, handle });
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_app() -> TerminalApp {
+        TerminalApp::new()
+    }
+
+    #[test]
+    fn handle_char_input_inserts_at_cursor() {
+        let mut app = make_app();
+        app.handle_char_input('a');
+        assert_eq!(app.current_input, "a");
+        assert_eq!(app.cursor_position, 1);
+
+        app.handle_char_input('b');
+        assert_eq!(app.current_input, "ab");
+        assert_eq!(app.cursor_position, 2);
+    }
+
+    #[test]
+    fn handle_char_input_inserts_at_mid_cursor() {
+        let mut app = make_app();
+        app.current_input = "ac".into();
+        app.cursor_position = 1;
+        app.handle_char_input('b');
+        assert_eq!(app.current_input, "abc");
+        assert_eq!(app.cursor_position, 2);
+    }
+
+    #[test]
+    fn remove_char_at_removes_correct_character() {
+        let mut app = make_app();
+        app.current_input = "abc".into();
+        app.remove_char_at(1);
+        assert_eq!(app.current_input, "ac");
+    }
+
+    #[test]
+    fn remove_char_at_out_of_bounds_does_nothing() {
+        let mut app = make_app();
+        app.current_input = "a".into();
+        app.remove_char_at(5);
+        assert_eq!(app.current_input, "a");
+    }
+
+    #[test]
+    fn handle_up_key_navigates_to_last_history() {
+        let mut app = make_app();
+        app.command_history = vec!["cmd1".into(), "cmd2".into(), "cmd3".into()];
+        app.handle_up_key();
+        assert_eq!(app.current_input, "cmd3");
+        assert_eq!(app.cursor_position, 4);
+        assert_eq!(app.history_index, Some(2));
+    }
+
+    #[test]
+    fn handle_up_key_twice_navigates_back_two() {
+        let mut app = make_app();
+        app.command_history = vec!["cmd1".into(), "cmd2".into(), "cmd3".into()];
+        app.handle_up_key();
+        app.handle_up_key();
+        assert_eq!(app.current_input, "cmd2");
+        assert_eq!(app.history_index, Some(1));
+    }
+
+    #[test]
+    fn handle_up_key_at_top_stops() {
+        let mut app = make_app();
+        app.command_history = vec!["cmd1".into(), "cmd2".into()];
+        app.handle_up_key();
+        app.handle_up_key();
+        assert_eq!(app.current_input, "cmd1");
+        app.handle_up_key();
+        assert_eq!(app.current_input, "cmd1");
+    }
+
+    #[test]
+    fn handle_up_key_empty_history_does_nothing() {
+        let mut app = make_app();
+        app.current_input = "test".into();
+        app.handle_up_key();
+        assert_eq!(app.current_input, "test");
+        assert!(app.history_index.is_none());
+    }
+
+    #[test]
+    fn handle_down_key_returns_forward() {
+        let mut app = make_app();
+        app.command_history = vec!["a".into(), "b".into(), "c".into()];
+        app.history_index = Some(0);
+        app.handle_down_key();
+        assert_eq!(app.current_input, "b");
+        assert_eq!(app.history_index, Some(1));
+    }
+
+    #[test]
+    fn handle_down_key_at_end_clears_input() {
+        let mut app = make_app();
+        app.command_history = vec!["cmd".into()];
+        app.history_index = Some(0);
+        app.current_input = "cmd".into();
+        app.handle_down_key();
+        assert_eq!(app.current_input, "");
+        assert_eq!(app.cursor_position, 0);
+        assert!(app.history_index.is_none());
+    }
+
+    #[test]
+    fn handle_down_key_no_history_does_nothing() {
+        let mut app = make_app();
+        app.current_input = "x".into();
+        app.handle_down_key();
+        assert_eq!(app.current_input, "x");
+    }
+
+    #[tokio::test]
+    async fn handle_ctrl_c_clears_input_on_first_press() {
+        let mut app = make_app();
+        app.current_input = "some text".into();
+        app.cursor_position = 5;
+        let (quit, msg) = app.handle_ctrl_c().await.unwrap();
+        assert!(!quit);
+        assert!(app.current_input.is_empty());
+        assert_eq!(app.cursor_position, 0);
+        assert!(msg.contains("cleared"));
+    }
+
+    #[tokio::test]
+    async fn handle_ctrl_c_second_press_exits() {
+        let mut app = make_app();
+        app.last_ctrl_c = Some(std::time::Instant::now());
+        let (quit, msg) = app.handle_ctrl_c().await.unwrap();
+        assert!(quit);
+        assert!(msg.contains("Exiting"));
+    }
+
+    #[tokio::test]
+    async fn handle_ctrl_c_empty_input_first_press_shows_hint() {
+        let mut app = make_app();
+        let (quit, msg) = app.handle_ctrl_c().await.unwrap();
+        assert!(!quit);
+        assert!(msg.contains("again"));
+    }
+
+    #[test]
+    fn history_up_then_down_returns_to_empty() {
+        let mut app = make_app();
+        app.command_history = vec!["hello".into()];
+        app.handle_up_key();
+        assert_eq!(app.current_input, "hello");
+        app.handle_down_key();
+        assert_eq!(app.current_input, "");
+        assert!(app.history_index.is_none());
     }
 }

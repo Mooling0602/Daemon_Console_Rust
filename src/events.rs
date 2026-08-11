@@ -2,6 +2,7 @@ use crate::logger::LogLevel;
 use chrono::Local;
 
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum DaemonConsoleEvent {
     UserConsoleInput {
         raw: String,    // raw input
