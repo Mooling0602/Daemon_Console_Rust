@@ -386,12 +386,10 @@ impl TerminalApp {
                     self.handle_char_input(c);
                     self.render_input_line()?;
                 }
-                KeyCode::Backspace => {
-                    if self.cursor_position > 0 {
-                        self.remove_char_at(self.cursor_position - 1);
-                        self.cursor_position -= 1;
-                        self.render_input_line()?;
-                    }
+                KeyCode::Backspace if self.cursor_position > 0 => {
+                    self.remove_char_at(self.cursor_position - 1);
+                    self.cursor_position -= 1;
+                    self.render_input_line()?;
                 }
                 _ => {}
             }
@@ -908,8 +906,6 @@ impl TerminalApp {
 
         for (i, cmd) in self.running_commands.iter().enumerate() {
             if cmd.handle.is_finished() {
-                // Log completion (using the command field)
-                let _ = &cmd.command;
                 completed_indices.push(i);
             }
         }

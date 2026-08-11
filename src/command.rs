@@ -109,7 +109,8 @@ pub async fn execute_command(app: &mut TerminalApp, command: &str) -> String {
     if let Some(handler) = app.commands.get(cmd_name) {
         match handler {
             CommandHandlerType::PubSync(_) => {
-                // Remove, execute, and put back sync handler
+                // Remove-execute-insert: must take handler out to pass &mut app to execute
+                // Known limitation: if execute panics the handler is lost
                 if let Some(CommandHandlerType::PubSync(mut sync_handler)) =
                     app.commands.remove(cmd_name)
                 {

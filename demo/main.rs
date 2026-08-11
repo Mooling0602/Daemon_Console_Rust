@@ -74,6 +74,7 @@ fn start_event_listener(
                 } => {
                     handle_subprocess_log_event(pid, &message, timestamp, &action_tx);
                 }
+                _ => {}
             }
         }
     });
