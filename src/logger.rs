@@ -220,3 +220,91 @@ macro_rules! get_critical {
         )
     };
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn log_message_info_contains_level_and_message() {
+        let msg = log_message(LogLevel::Info, "server started", None);
+        assert!(msg.contains("INFO"), "should contain level name");
+        assert!(msg.contains("server started"), "should contain message");
+    }
+
+    #[test]
+    fn log_message_warn_contains_level_and_message() {
+        let msg = log_message(LogLevel::Warn, "low memory", None);
+        assert!(msg.contains("WARN"), "should contain level name");
+        assert!(msg.contains("low memory"), "should contain message");
+    }
+
+    #[test]
+    fn log_message_error_contains_level_and_message() {
+        let msg = log_message(LogLevel::Error, "connection failed", None);
+        assert!(msg.contains("ERROR"), "should contain level name");
+        assert!(msg.contains("connection failed"), "should contain message");
+    }
+
+    #[test]
+    fn log_message_debug_contains_level_and_message() {
+        let msg = log_message(LogLevel::Debug, "trace data", None);
+        assert!(msg.contains("DEBUG"), "should contain level name");
+        assert!(msg.contains("trace data"), "should contain message");
+    }
+
+    #[test]
+    fn log_message_critical_contains_level_and_message() {
+        let msg = log_message(LogLevel::Critical, "system halt", None);
+        assert!(msg.contains("CRITICAL"), "should contain level name");
+        assert!(msg.contains("system halt"), "should contain message");
+    }
+
+    #[test]
+    fn log_message_includes_module_name_when_provided() {
+        let msg = log_message(LogLevel::Info, "test", Some("my_module"));
+        assert!(msg.contains("my_module"), "should contain module name");
+    }
+
+    #[test]
+    fn log_message_no_module_omits_slash_prefix() {
+        let msg = log_message(LogLevel::Info, "test", None);
+        assert!(!msg.contains("[]"), "empty module should not insert /");
+        assert!(msg.contains("INFO"), "should still contain level");
+    }
+
+    #[test]
+    fn log_message_has_timestamp_format() {
+        let msg = log_message(LogLevel::Info, "test", None);
+        let prefix: String = msg.chars().take(10).collect();
+        assert!(
+            prefix.starts_with('[') && prefix.contains(':') && prefix.contains(']'),
+            "should contain [HH:MM:SS] timestamp, got: {}",
+            prefix
+        );
+    }
+
+    #[test]
+    fn format_multiline_single_line_same_as_log_message() {
+        let single = format_multiline_message(LogLevel::Info, "one line", None);
+        let direct = log_message(LogLevel::Info, "one line", None);
+        assert_eq!(single, direct);
+    }
+
+    #[test]
+    fn format_multiline_splits_on_newlines() {
+        let result = format_multiline_message(LogLevel::Info, "line1\nline2\nline3", None);
+        let lines: Vec<&str> = result.lines().collect();
+        assert_eq!(lines.len(), 3, "should produce 3 formatted lines");
+        assert!(lines[0].contains("line1"));
+        assert!(lines[1].contains("line2"));
+        assert!(lines[2].contains("line3"));
+    }
+
+    #[test]
+    fn format_multiline_preserves_module_name() {
+        let result = format_multiline_message(LogLevel::Warn, "a\nb", Some("mod"));
+        assert!(result.contains("mod"), "each line should have module name");
+        assert_eq!(result.lines().count(), 2);
+    }
+}

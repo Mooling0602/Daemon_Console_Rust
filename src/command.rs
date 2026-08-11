@@ -157,3 +157,79 @@ pub async fn execute_command(app: &mut TerminalApp, command: &str) -> String {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::TerminalApp;
+
+    #[test]
+    fn command_handler_blanket_impl_for_closure() {
+        let mut app = TerminalApp::new();
+        let mut handler = |_app: &mut TerminalApp, args: &[&str]| -> String {
+            format!("got {} args", args.len())
+        };
+        let result = handler.execute(&mut app, &["a", "b"]);
+        assert_eq!(result, "got 2 args");
+    }
+
+    #[test]
+    fn command_handler_type_as_sync_returns_true_for_sync() {
+        let handler: Box<dyn CommandHandler> =
+            Box::new(|_: &mut TerminalApp, _: &[&str]| "ok".into());
+        let ct = CommandHandlerType::PubSync(handler);
+        assert!(ct.as_sync());
+    }
+
+    #[tokio::test]
+    async fn execute_command_registered_sync_returns_result() {
+        let mut app = TerminalApp::new();
+        app.register_command(
+            "greet",
+            Box::new(|_: &mut TerminalApp, args: &[&str]| -> String {
+                if args.is_empty() {
+                    "hello".into()
+                } else {
+                    format!("hello {}", args[0])
+                }
+            }),
+        );
+
+        let result = execute_command(&mut app, "greet world").await;
+        assert!(result.contains("hello world"));
+
+        let result2 = execute_command(&mut app, "greet").await;
+        assert!(result2.contains("hello"));
+    }
+
+    #[tokio::test]
+    async fn execute_command_unknown_handler_fallback() {
+        let mut app = TerminalApp::new();
+        app.set_unknown_command_handler(|cmd: &str| format!("unknown: {}", cmd));
+
+        let result = execute_command(&mut app, "nonexistent").await;
+        assert!(result.contains("unknown: nonexistent"));
+    }
+
+    #[tokio::test]
+    async fn execute_command_empty_input_returns_empty() {
+        let mut app = TerminalApp::new();
+        let result = execute_command(&mut app, "").await;
+        assert!(result.is_empty());
+    }
+
+    #[tokio::test]
+    async fn execute_command_whitespace_input_returns_empty() {
+        let mut app = TerminalApp::new();
+        let result = execute_command(&mut app, "   ").await;
+        assert!(result.is_empty());
+    }
+
+    #[tokio::test]
+    async fn execute_command_unregistered_returns_warning() {
+        let mut app = TerminalApp::new();
+        let result = execute_command(&mut app, "no_such_cmd").await;
+        assert!(result.contains("not found"));
+        assert!(result.contains("no_such_cmd"));
+    }
+}

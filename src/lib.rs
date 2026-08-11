@@ -955,3 +955,160 @@ impl TerminalApp {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_app() -> TerminalApp {
+        TerminalApp::new()
+    }
+
+    #[test]
+    fn handle_char_input_inserts_at_cursor() {
+        let mut app = make_app();
+        app.handle_char_input('a');
+        assert_eq!(app.current_input, "a");
+        assert_eq!(app.cursor_position, 1);
+
+        app.handle_char_input('b');
+        assert_eq!(app.current_input, "ab");
+        assert_eq!(app.cursor_position, 2);
+    }
+
+    #[test]
+    fn handle_char_input_inserts_at_mid_cursor() {
+        let mut app = make_app();
+        app.current_input = "ac".into();
+        app.cursor_position = 1;
+        app.handle_char_input('b');
+        assert_eq!(app.current_input, "abc");
+        assert_eq!(app.cursor_position, 2);
+    }
+
+    #[test]
+    fn remove_char_at_removes_correct_character() {
+        let mut app = make_app();
+        app.current_input = "abc".into();
+        app.remove_char_at(1);
+        assert_eq!(app.current_input, "ac");
+    }
+
+    #[test]
+    fn remove_char_at_out_of_bounds_does_nothing() {
+        let mut app = make_app();
+        app.current_input = "a".into();
+        app.remove_char_at(5);
+        assert_eq!(app.current_input, "a");
+    }
+
+    #[test]
+    fn handle_up_key_navigates_to_last_history() {
+        let mut app = make_app();
+        app.command_history = vec!["cmd1".into(), "cmd2".into(), "cmd3".into()];
+        app.handle_up_key();
+        assert_eq!(app.current_input, "cmd3");
+        assert_eq!(app.cursor_position, 4);
+        assert_eq!(app.history_index, Some(2));
+    }
+
+    #[test]
+    fn handle_up_key_twice_navigates_back_two() {
+        let mut app = make_app();
+        app.command_history = vec!["cmd1".into(), "cmd2".into(), "cmd3".into()];
+        app.handle_up_key();
+        app.handle_up_key();
+        assert_eq!(app.current_input, "cmd2");
+        assert_eq!(app.history_index, Some(1));
+    }
+
+    #[test]
+    fn handle_up_key_at_top_stops() {
+        let mut app = make_app();
+        app.command_history = vec!["cmd1".into(), "cmd2".into()];
+        app.handle_up_key();
+        app.handle_up_key();
+        assert_eq!(app.current_input, "cmd1");
+        app.handle_up_key();
+        assert_eq!(app.current_input, "cmd1");
+    }
+
+    #[test]
+    fn handle_up_key_empty_history_does_nothing() {
+        let mut app = make_app();
+        app.current_input = "test".into();
+        app.handle_up_key();
+        assert_eq!(app.current_input, "test");
+        assert!(app.history_index.is_none());
+    }
+
+    #[test]
+    fn handle_down_key_returns_forward() {
+        let mut app = make_app();
+        app.command_history = vec!["a".into(), "b".into(), "c".into()];
+        app.history_index = Some(0);
+        app.handle_down_key();
+        assert_eq!(app.current_input, "b");
+        assert_eq!(app.history_index, Some(1));
+    }
+
+    #[test]
+    fn handle_down_key_at_end_clears_input() {
+        let mut app = make_app();
+        app.command_history = vec!["cmd".into()];
+        app.history_index = Some(0);
+        app.current_input = "cmd".into();
+        app.handle_down_key();
+        assert_eq!(app.current_input, "");
+        assert_eq!(app.cursor_position, 0);
+        assert!(app.history_index.is_none());
+    }
+
+    #[test]
+    fn handle_down_key_no_history_does_nothing() {
+        let mut app = make_app();
+        app.current_input = "x".into();
+        app.handle_down_key();
+        assert_eq!(app.current_input, "x");
+    }
+
+    #[tokio::test]
+    async fn handle_ctrl_c_clears_input_on_first_press() {
+        let mut app = make_app();
+        app.current_input = "some text".into();
+        app.cursor_position = 5;
+        let (quit, msg) = app.handle_ctrl_c().await.unwrap();
+        assert!(!quit);
+        assert!(app.current_input.is_empty());
+        assert_eq!(app.cursor_position, 0);
+        assert!(msg.contains("cleared"));
+    }
+
+    #[tokio::test]
+    async fn handle_ctrl_c_second_press_exits() {
+        let mut app = make_app();
+        app.last_ctrl_c = Some(std::time::Instant::now());
+        let (quit, msg) = app.handle_ctrl_c().await.unwrap();
+        assert!(quit);
+        assert!(msg.contains("Exiting"));
+    }
+
+    #[tokio::test]
+    async fn handle_ctrl_c_empty_input_first_press_shows_hint() {
+        let mut app = make_app();
+        let (quit, msg) = app.handle_ctrl_c().await.unwrap();
+        assert!(!quit);
+        assert!(msg.contains("again"));
+    }
+
+    #[test]
+    fn history_up_then_down_returns_to_empty() {
+        let mut app = make_app();
+        app.command_history = vec!["hello".into()];
+        app.handle_up_key();
+        assert_eq!(app.current_input, "hello");
+        app.handle_down_key();
+        assert_eq!(app.current_input, "");
+        assert!(app.history_index.is_none());
+    }
+}
