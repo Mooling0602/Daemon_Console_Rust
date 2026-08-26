@@ -1,5 +1,7 @@
 # Daemon Console
 
+[English](README.md) | [简体中文](README_zh_CN.md)
+
 一个灵活的守护进程（daemon）应用控制台，提供带命令注册、历史导航与彩色日志的终端界面。
 
 ## 特性

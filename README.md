@@ -1,5 +1,7 @@
 # Daemon Console
 
+[English](README.md) | [简体中文](README_zh_CN.md)
+
 A flexible console for daemon applications providing a terminal interface with command registration, history navigation, and colored logging.
 
 ## Features
